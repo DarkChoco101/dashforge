@@ -308,6 +308,7 @@ RD.UI = {
       <label>Keep screen awake ${chk('wake')}</label>
       <label>Graphics quality ${sel('quality', [['auto', 'Auto (recommended)'], ['high', 'High (glow effects)'], ['low', 'Low (old devices)']])}</label>
       <label>Max frame rate ${sel('maxFps', [[60, '60'], [30, '30 (saves battery)'], [20, '20']])}</label>
+      <label>Animated backgrounds (grid, stars, aurora…) — costs FPS ${chk('bgAnim')}</label>
       <label>Show FPS counter ${chk('fps')}</label>
       <h3>Sound</h3>
       <label>Voice alerts ${chk('voice')}</label>
@@ -323,6 +324,7 @@ RD.UI = {
       S[k] = v; RD.saveSettings();
       if (k === 'quality') { RD.lowPerf = false; RD.hq = v !== 'low'; RD.layout(); }
       if (k === 'units' || k === 'pressure') RD.faceCache.clear();
+      if (k === 'bgAnim') { RD.bgCache.k = ''; RD._dirty = true; }
       RD.updateHud();
     });
     b.querySelector('#st-reset').onclick = () => { if (confirm('Reset all settings to defaults?')) { const sk = S.skin; RD.settings = Object.assign({}, RD.defaults, { skin: sk }); RD.settings.alerts = RD.clone(RD.defaults.alerts); RD.saveSettings(); RD.layout(); RD.UI.settings(); } };
