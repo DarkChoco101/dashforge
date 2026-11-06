@@ -111,3 +111,5 @@ table.chk td:last-child{text-align:left}
 #edbar select{min-height:34px;padding:4px 8px}
 .swatches{display:flex;flex-wrap:wrap;gap:6px}.sw{width:36px;height:36px;border-radius:10px;border:2px solid #2d3b54;cursor:pointer}
 @media (max-width:700px){.editing #edpanel{width:240px}.hud-r button{width:44px;height:44px}}
+
+.passenger.dock-on #dock{width:min(62vw,880px)}

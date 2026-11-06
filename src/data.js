@@ -393,6 +393,7 @@ RD.checkAlerts = () => {
   const now = Date.now(); let top = null;
   (RD.settings.alerts || []).forEach((al, i) => {
     if (!al.on) return;
+    if (RD.passenger() && RD.GPS_CH.indexOf(al.src) < 0) return;
     const v = RD.toDisp(al.src, RD.data[al.src]);
     const hit = al.op === '<' ? v < al.val : v > al.val;
     const st = RD.alertState[i] = RD.alertState[i] || { active: false, last: 0 };

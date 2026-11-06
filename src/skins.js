@@ -30,7 +30,71 @@ RD.gScreen = () => ({
   ]
 });
 
+RD.pTripScreen = () => ({
+  name: 'Journey', widgets: [
+    W('text', 40, 20, 600, 50, { text: 'JOURNEY', size: 26, align: 'left', color: '@dim', weight: '900' }),
+    W('text', 840, 20, 400, 50, { text: '{clock}', size: 30, align: 'right' }),
+    ...[['tripDist', 'Distance'], ['tripTime', 'Drive Time'], ['avgSpeed', 'Avg Speed'], ['maxSpeed', 'Top Speed']].map((c, i) =>
+      W('digital', 40 + i * 305, 90, 290, 170, { src: c[0], label: c[1], panel: '@panel', border: '@line', dec: c[0] === 'tripDist' ? 1 : '' })),
+    W('graph', 40, 280, 800, 410, { src: 'speed', min: 0, max: 140, secs: 300, panel: '@panel', label: 'Speed — last 5 min' }),
+    W('compass', 860, 280, 380, 80, { panel: '@panel' }),
+    W('digital', 860, 375, 380, 150, { src: 'altitude', panel: '@panel', border: '@line' }),
+    W('digital', 860, 540, 380, 150, { src: 'speed', label: 'Now', panel: '@panel', border: '@line' })
+  ]
+});
+RD.PASSENGER_IDS = ['pglass', 'pnight', 'pmini'];
 RD.BUILTIN = [
+  {
+    id: 'pglass', name: 'Passenger Glass', font: 'sans', glow: true, passenger: true,
+    bg: { type: 'radial', c1: '#13243d', c2: '#03060c' },
+    pal: { primary: '#5ac8ff', accent: '#b388ff', warn: '#ff5c7a', text: '#ffffff', dim: '#8aa0bd', track: '#1a2a40', face: 'none', ring: '#2c4060', panel: 'rgba(30,50,80,0.4)', line: '#24364f', ghost: 'rgba(90,200,255,0.06)' },
+    screens: [{
+      name: 'Cruise', widgets: [
+        W('text', 40, 30, 360, 80, { text: '{clock}', size: 68, align: 'left', weight: '700' }),
+        W('text', 42, 108, 360, 36, { text: '{date}', size: 22, align: 'left', color: '@dim', weight: '600' }),
+        W('compass', 880, 40, 360, 64, { panel: '@panel' }),
+        W('radial', 390, 30, 500, 500, { src: 'speed', min: 0, max: 160, red: '', numDiv: 1, mode: 'arcOnly', start: 150, sweep: 240, face: 'none', ringW: 0, label: '', sub: '', showValue: false, arcW: 0.06 }),
+        W('digital', 470, 160, 340, 230, { src: 'speed', label: '-' }),
+        W('text', 470, 400, 340, 36, { text: 'SPEED', size: 18, color: '@dim', weight: '800' }),
+        W('gmeter', 60, 190, 280, 280, { maxG: 1 }),
+        W('digital', 950, 150, 290, 140, { src: 'altitude', panel: '@panel', border: '@line' }),
+        W('digital', 950, 305, 290, 140, { src: 'heading', label: 'Heading', panel: '@panel', border: '@line' }),
+        ...[['tripDist', 'Trip'], ['tripTime', 'Drive time'], ['avgSpeed', 'Average'], ['maxSpeed', 'Top speed']].map((c, i) =>
+          W('digital', 40 + i * 305, 560, 290, 130, { src: c[0], label: c[1], panel: '@panel', border: '@line', dec: c[0] === 'tripDist' ? 1 : '' }))
+      ]
+    }, RD.pTripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'pnight', name: 'Night Cruise', font: 'seg7', glow: true, passenger: true,
+    bg: { type: 'solid', c1: '#050302' },
+    pal: { primary: '#ff9f1a', accent: '#ffcf70', warn: '#ff3b1a', text: '#ffb347', dim: '#7a5320', track: '#241606', face: 'none', ring: '#3a2408', panel: 'rgba(40,24,4,0.35)', line: '#3a2408', ghost: 'rgba(255,159,26,0.07)' },
+    screens: [{
+      name: 'Night', widgets: [
+        W('digital', 330, 100, 620, 330, { src: 'speed', label: '-' }),
+        W('bar', 330, 450, 620, 26, { src: 'speed', min: 0, max: 140, label: '', showValue: false, segs: 40, gap: 0.35, radius: 1, t1: 0.7, t2: 0.85 }),
+        W('text', 40, 40, 400, 70, { text: '{clock}', size: 60, align: 'left', font: 'seg7' }),
+        W('compass', 880, 40, 360, 64, {}),
+        W('digital', 60, 540, 360, 140, { src: 'tripDist', label: 'Trip' }),
+        W('digital', 460, 540, 360, 140, { src: 'tripTime', label: 'Time', showUnit: false }),
+        W('digital', 860, 540, 360, 140, { src: 'altitude', label: 'Alt' })
+      ]
+    }, RD.pTripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'pmini', name: 'Minimal Speed', font: 'sans', glow: false, passenger: true,
+    bg: { type: 'solid', c1: '#000' },
+    pal: { primary: '#ffffff', accent: '#bdbdbd', warn: '#ff453a', text: '#ffffff', dim: '#6e6e6e', track: '#1c1c1c', face: 'none', ring: '#333', panel: '#0c0c0c', line: '#222', ghost: 'rgba(255,255,255,0.04)' },
+    screens: [{
+      name: 'Clean', widgets: [
+        W('text', 40, 30, 400, 60, { text: '{clock}', size: 44, align: 'left', weight: '400' }),
+        W('text', 840, 30, 400, 60, { text: '{date}', size: 24, align: 'right', color: '@dim', weight: '400' }),
+        W('digital', 240, 130, 800, 400, { src: 'speed', label: '-', size: 1.1 }),
+        W('digital', 140, 580, 320, 110, { src: 'tripDist', label: 'Trip' }),
+        W('digital', 480, 580, 320, 110, { src: 'tripTime', label: 'Time', showUnit: false }),
+        W('digital', 820, 580, 320, 110, { src: 'avgSpeed', label: 'Average' })
+      ]
+    }, RD.pTripScreen(), RD.gScreen()]
+  },
   {
     id: 'neon', name: 'Neon Pulse', font: 'wide', glow: true,
     bg: { type: 'radial', c1: '#0c1a38', c2: '#02040a' },

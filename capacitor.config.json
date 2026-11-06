@@ -1,7 +1,27 @@
 {
-  "appId": "com.dashforge.cardash",
-  "appName": "DashForge",
-  "webDir": "www",
-  "android": { "allowMixedContent": false, "backgroundColor": "#000000" },
-  "plugins": { "BluetoothLe": { "displayStrings": { "scanning": "Scanning for OBD2 adapters…", "cancel": "Cancel", "availableDevices": "OBD2 adapters", "noDeviceFound": "No adapter found" } } }
+ "appId": "com.dashforge.cardash",
+ "appName": "DashForge",
+ "webDir": "www",
+ "android": {
+  "allowMixedContent": false,
+  "backgroundColor": "#000000"
+ },
+ "plugins": {
+  "BluetoothLe": {
+   "displayStrings": {
+    "scanning": "Scanning for OBD2 adapters\u2026",
+    "cancel": "Cancel",
+    "availableDevices": "OBD2 adapters",
+    "noDeviceFound": "No adapter found"
+   }
+  }
+ },
+ "server": {
+  "url": "https://darkchoco101.github.io/dashforge/",
+  "cleartext": false,
+  "allowNavigation": [
+   "darkchoco101.github.io"
+  ],
+  "errorPath": "index.html"
+ }
 }

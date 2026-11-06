@@ -127,6 +127,7 @@ RD.updateHud = () => {
   if (src === 'obd') { txt = 'OBD2 · ' + st.obd; cls = st.obd === 'live' ? 'ok' : st.obd === 'error' || st.obd === 'no-ecu' ? 'bad' : 'warn'; }
   if (src === 'gps') { txt = 'GPS · ' + st.gps; cls = st.gps === 'fix' ? 'ok' : st.gps === 'error' ? 'bad' : 'warn'; }
   if (src === 'sim') { txt = 'Demo mode'; cls = 'warn'; }
+  if (RD.passenger()) txt = (st.gps === 'fix' ? '🛰 GPS' : '🛰 GPS ' + st.gps) + ' · Passenger';
   pill.textContent = txt; pill.className = 'pill ' + cls;
   const tp = RD.$('#trippill');
   if (RD.Trips.cur) { tp.style.display = ''; tp.textContent = '● REC ' + RD.fmt('tripDist', RD.Trips.cur.dist) + ' ' + RD.unitFor('tripDist'); } else tp.style.display = 'none';
@@ -184,6 +185,7 @@ RD.fullscreen = () => {
 /* ---------- boot ---------- */
 RD.boot = () => {
   RD.hq = RD.settings.quality !== 'low';
+  document.body.classList.toggle('passenger', RD.passenger());
   if (!RD.skinById(RD.settings.skin)) RD.settings.skin = 'neon';
   RD.layout(); RD.updateDots(); RD.initInput();
   RD.Sources[RD.settings.source] ? RD.setSource(RD.settings.source) : RD.setSource('sim');

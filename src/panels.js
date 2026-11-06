@@ -37,7 +37,7 @@ RD.UI = {
     const b = RD.UI.modal('Welcome to DashForge', `
       <p class="lead">Your car dashboard, built your way.</p>
       <ul class="feat"><li><b>Swipe</b> left/right to change screens. <b>Tap</b> to show controls.</li>
-      <li>You're in <b>Demo mode</b> (simulated drive). Switch to <b>GPS</b> (no adapter needed) or <b>OBD2</b> in Menu → Connection.</li>
+      <li>Passenger / second-screen mode: live <b>GPS speed, trip and compass</b>, plus the ▶ media dock for YouTube, Netflix and apps. Video plays while moving.</li>
       <li>Pick from ${RD.BUILTIN.length} skins, or tap <b>Edit Dashboard</b> to drag, resize and restyle anything.</li>
       <li>▶ opens the media dock: YouTube and one-tap app launcher.</li></ul>
       <div class="row"><button class="btn primary" id="w-skins">Choose a skin</button><button class="btn" id="w-dev">Check this device</button><button class="btn ghost" id="w-go">Start driving</button></div>`);
@@ -46,15 +46,18 @@ RD.UI = {
     b.querySelector('#w-go').onclick = () => RD.UI.close();
   },
   menu() {
-    const tiles = [
+    const P = RD.passenger();
+    let tiles = [
       ['skins', '🎨', 'Skins', RD.skin().name], ['edit', '✏️', 'Edit Dashboard', 'Drag, resize, restyle'], ['conn', '🔌', 'Connection', RD.Sources[RD.settings.source].name],
-      ['trips', '🗺️', 'Trips & GPS Log', RD.Trips.cur ? 'Recording…' : RD.Trips.list.length + ' saved'], ['perf', '⏱️', 'Performance', '0-100 · ¼ mile'], ['media', '▶️', 'Media & Apps', 'YouTube · launcher'],
+      ['trips', '🗺️', 'Trips & GPS Log', RD.Trips.cur ? 'Recording…' : RD.Trips.list.length + ' saved'], ['perf', '⏱️', 'Performance', '0-100 · ¼ mile'], ['media', '▶️', 'Media & Apps', 'YouTube · Netflix · apps'],
       ['dtc', '🔧', 'Fault Codes', 'Read / clear'], ['alerts', '🔔', 'Alerts', (RD.settings.alerts || []).filter(a => a.on).length + ' active'], ['settings', '⚙️', 'Settings', 'Units, display, car'],
       ...(RD.installEvt ? [['install', '⬇️', 'Install App', 'Add to home screen']] : []),
       ['apps', '⊞', 'All Apps', 'Every app on this tablet'],
       ['home', '🏠', 'Home Screen', RD.nativeL() ? 'Set DashForge as Home' : 'Needs the APK'],
-      ['device', '📱', 'Device Check', 'Tablet compatibility'], ['io', '💾', 'Backup & Share', 'Import / export'], ['night', '🌙', 'Night Mode', RD.settings.night ? 'On' : 'Off']
+      ['device', '📱', 'Device Check', 'Tablet compatibility'], ['io', '💾', 'Backup & Share', 'Import / export'], ['night', '🌙', 'Night Mode', RD.settings.night ? 'On' : 'Off'],
+      ['mode', P ? '🚘' : '🛋️', P ? 'Driver Mode' : 'Passenger Mode', P ? 'Switch to engine data (OBD2)' : 'Second screen, GPS only']
     ];
+    if (P) tiles = tiles.filter(t => t[0] !== 'dtc' && t[0] !== 'conn');
     const b = RD.UI.modal('Menu', `<div class="tiles">${tiles.map(t => `<button class="tile" data-k="${t[0]}"><span class="ic">${t[1]}</span><b>${t[2]}</b><small>${esc(t[3])}</small></button>`).join('')}</div>
       <p class="foot">DashForge v${RD.VERSION} · Trip ${RD.fmt('tripDist', RD.trip.dist)} ${RD.unitFor('tripDist')} <button class="link" id="rt">reset</button></p>`, { back: () => RD.UI.close() });
     b.querySelector('#rt').onclick = () => { RD.resetTrip(); RD.UI.menu(); };
@@ -63,6 +66,7 @@ RD.UI = {
       if (k === 'edit') { RD.UI.close(); RD.Editor.start(); }
       else if (k === 'media') { RD.UI.close(); RD.Media.open(); }
       else if (k === 'home') RD.UI.homeSetup();
+      else if (k === 'mode') { const toP = !RD.passenger(); RD.settings.mode = toP ? 'passenger' : 'driver'; RD.saveSettings(); RD.setSource(toP ? 'gps' : 'sim'); RD.setSkin(toP ? 'pglass' : 'neon'); document.body.classList.toggle('passenger', toP); RD.toast(toP ? 'Passenger mode: GPS + media' : 'Driver mode: engine dashboards'); RD.UI.close(); }
       else if (k === 'install') { RD.installEvt.prompt(); RD.installEvt.userChoice.finally(() => { RD.installEvt = null; RD.UI.close(); }); }
       else if (k === 'night') { RD.settings.night = !RD.settings.night; RD.saveSettings(); RD.updateHud(); RD.UI.menu(); }
       else RD.UI[k]();
@@ -71,11 +75,12 @@ RD.UI = {
 
   /* ---------- skins gallery ---------- */
   skins() {
-    const all = RD.allSkins();
+    let all = RD.allSkins();
+    if (RD.passenger()) all = all.filter(s => s.passenger || s.user).concat(all.filter(s => !s.passenger && !s.user));
     const b = RD.UI.modal('Skins', `<div class="skins">${all.map(s => `
       <div class="skin ${s.id === RD.settings.skin ? 'cur' : ''}" data-id="${s.id}">
         <canvas width="320" height="180"></canvas>
-        <div class="meta"><b>${esc(s.name)}</b><small>${s.user ? 'Custom' : 'Built-in'} · ${s.screens.length} screens</small></div>
+        <div class="meta"><b>${esc(s.name)}</b><small>${s.user ? 'Custom' : s.passenger ? 'GPS · passenger' : 'Engine data (OBD2)'} · ${s.screens.length} screens</small></div>
         <div class="acts"><button class="btn sm primary" data-a="use">Use</button><button class="btn sm" data-a="dup">Customize</button>${s.user ? '<button class="btn sm danger" data-a="del">Delete</button>' : ''}</div>
       </div>`).join('')}</div>
       <div class="row"><button class="btn" id="sk-imp">Import skin file…</button><button class="btn" id="sk-new">New blank skin</button></div>`, { wide: true });
@@ -405,7 +410,8 @@ RD.Media = {
   APPS: [
     ['YouTube', '#ff0000', '▶', 'com.google.android.youtube'], ['YT Music', '#ff0033', '♫', 'com.google.android.apps.youtube.music'], ['Spotify', '#1db954', '◉', 'com.spotify.music'],
     ['JioSaavn', '#2bc5b4', '♪', 'com.jio.media.jiobeats'], ['Google Maps', '#34a853', '➤', 'com.google.android.apps.maps'], ['Waze', '#33ccff', '☺', 'com.waze'],
-    ['WhatsApp', '#25d366', '✆', 'com.whatsapp'], ['Phone', '#4f8cff', '☎', 'tel:'], ['Android Auto', '#3ddc84', 'A', 'com.google.android.projection.gearhead']
+    ['Netflix', '#e50914', 'N', 'com.netflix.mediaclient'], ['Prime Video', '#00a8e1', '▶', 'com.amazon.avod.thirdpartyclient'], ['JioHotstar', '#0f1d6b', '★', 'in.startv.hotstar'],
+    ['VLC', '#ff8800', '▲', 'org.videolan.vlc'], ['WhatsApp', '#25d366', '✆', 'com.whatsapp'], ['Phone', '#4f8cff', '☎', 'tel:'], ['Android Auto', '#3ddc84', 'A', 'com.google.android.projection.gearhead']
   ],
   init() {
     this.favs = RD.store.get('ytfavs', [{ t: 'Lo-fi drive mix', id: 'jfKfPfyJRdk', live: true }]);
@@ -465,7 +471,7 @@ RD.Media = {
   },
   guard() {
     const pk = RD.$('#parked'); if (!pk) return;
-    const moving = RD.data.speed > 8 && RD.settings.source !== 'sim' && !RD.settings.videoMoving;
+    const moving = RD.data.speed > 8 && RD.settings.source !== 'sim' && !RD.settings.videoMoving && !RD.passenger();
     pk.classList.toggle('show', !!(moving && this.cur));
   },
   open() { this.isOpen = true; document.body.classList.add('dock-on'); setTimeout(RD.layout, 260); },

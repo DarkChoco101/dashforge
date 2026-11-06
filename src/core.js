@@ -17,6 +17,9 @@ RD.defaults = {
 };
 RD.settings = Object.assign({}, RD.defaults, RD.store.get('settings', {}));
 RD.saveSettings = () => RD.store.set('settings', RD.settings);
+if (!RD.settings.modeSet) { RD.settings.mode = 'passenger'; RD.settings.skin = 'pglass'; RD.settings.source = 'gps'; RD.settings.screen = 0; RD.settings.modeSet = true; RD.saveSettings(); }
+RD.passenger = () => RD.settings.mode === 'passenger';
+RD.GPS_CH = ['speed', 'heading', 'altitude', 'gpsAcc', 'tripDist', 'tripTime', 'avgSpeed', 'maxSpeed', 'accelX', 'accelY', 'hp'];
 
 /* Channels — canonical units: speed km/h, temp °C, boost bar, dist km, eco km/L */
 RD.CH = {
