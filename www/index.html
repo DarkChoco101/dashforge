@@ -163,7 +163,7 @@ RD.defaults = {
   units: 'metric', pressure: 'bar', ratios: '7.5,13,19,26,33,40', redline: 6500,
   night: false, brightness: 1, wake: true, fps: false, maxFps: 60, quality: 'auto',
   source: 'sim', skin: 'neon', screen: 0, tank: 45, fuelPrice: 105, volume: 0.6,
-  voice: true, obdFast: '0C,0D,11', obdSlow: '05,0F,04,0B,10,42,2F,0E,5C,46'
+  voice: true, bgAnim: false, obdFast: '0C,0D,11', obdSlow: '05,0F,04,0B,10,42,2F,0E,5C,46'
 };
 RD.settings = Object.assign({}, RD.defaults, RD.store.get('settings', {}));
 RD.saveSettings = () => RD.store.set('settings', RD.settings);
@@ -335,15 +335,16 @@ RD.seg7 = (ctx, str, x, y, h, color, align, ghost) => {
 
 /* ---------- text helper ---------- */
 RD.text = (ctx, str, x, y, px, o) => {
-  o = o || {}; const f = o.font || 'sans';
+  o = o || {}; let f = o.font || 'sans';
+  if (f === 'seg7' && /[^0-9\-\s.:NnRrPEFAbCcdHhLoOStUuy_°]/.test(str)) f = 'mono';
   if (f === 'seg7') { RD.seg7(ctx, str, x, y, px * 0.78, o.color || '#fff', o.align || 'left', o.ghost); return; }
   const fs = (o.italic ? 'italic ' : '') + (o.weight || 600) + ' ' + Math.max(1, px).toFixed(0) + 'px ' + (RD.FONTS[f] || RD.FONTS.sans);
   if (ctx._rdf !== fs) { ctx.font = fs; ctx._rdf = fs; }
   ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'middle';
   ctx.fillStyle = o.color || '#fff';
-  if (o.glow && RD.hq) { ctx.shadowColor = o.glow; ctx.shadowBlur = px * 0.35; }
+  if (o.glow && RD.settings.quality === 'high') { ctx.shadowColor = o.glow; ctx.shadowBlur = px * 0.35; ctx.fillText(str, x, y); ctx.shadowBlur = 0; return; }
+  if (o.glow) { ctx.globalAlpha = 0.16; ctx.strokeStyle = o.glow; ctx.lineWidth = Math.min(px * 0.07, 9); ctx.lineJoin = 'round'; ctx.strokeText(str, x, y); ctx.globalAlpha = 1; }
   ctx.fillText(str, x, y);
-  if (o.glow) ctx.shadowBlur = 0;
 };
 RD.measure = (ctx, str, px, f, weight) => {
   if (f === 'seg7') return RD.seg7Width(str, px * 0.78);
@@ -451,13 +452,11 @@ RD.WT.radial = {
     const hot = f >= redF;
     if (w.mode !== 'needle' && f > 0.001) {
       ctx.strokeStyle = hot ? RD.col(w.redC, skin) : RD.col(w.arc, skin); ctx.lineWidth = r * w.arcW; ctx.lineCap = 'butt';
-      if (w.glow && RD.hq) { ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = r * 0.12; }
-      ctx.beginPath(); ctx.arc(cx, cy, ar, a0, a0 + sw * f); ctx.stroke(); ctx.shadowBlur = 0;
+      RD.glowStroke(ctx, () => { ctx.beginPath(); ctx.arc(cx, cy, ar, a0, a0 + sw * f); }, ctx.strokeStyle, r * w.arcW, w.glow ? 0.8 : 0);
     }
     if (w.mode === 'needle' || w.mode === 'both') {
       const a = a0 + sw * f, ca = Math.cos(a), sa = Math.sin(a), nx = -sa, ny = ca, nw = r * 0.028;
       ctx.fillStyle = RD.col(w.needle, skin);
-      if (w.glow && RD.hq) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = r * 0.08; }
       ctx.beginPath(); ctx.moveTo(cx - ca * r * 0.16 + nx * nw, cy - sa * r * 0.16 + ny * nw); ctx.lineTo(cx + ca * r * 0.9, cy + sa * r * 0.9);
       ctx.lineTo(cx - ca * r * 0.16 - nx * nw, cy - sa * r * 0.16 - ny * nw); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
       ctx.fillStyle = RD.col('@ring', skin); ctx.beginPath(); ctx.arc(cx, cy, r * 0.075, 0, 7); ctx.fill();
@@ -525,11 +524,14 @@ RD.WT.digital = {
     panel: 'none', border: 'none', radius: 10, warnHi: '', warnLo: '', warnC: '@warn', size: 1, smooth: 0 },
   props: [P('src', 'Data', 'ch'), P('dec', 'Decimals (blank=auto)', 'num'), P('label', 'Label (blank=auto)', 'text'), P('showUnit', 'Show unit', 'bool'), P('align', 'Align', 'sel', ['left', 'center', 'right']),
     P('font', 'Font', 'font'), P('size', 'Text scale', 'num'), ...COLORS(['color', 'Value color'], ['labelC', 'Label color'], ['panel', 'Panel fill'], ['border', 'Border'], ['warnC', 'Warning color']),
-    P('radius', 'Corner radius', 'num'), P('warnHi', 'Warn above', 'num'), P('warnLo', 'Warn below', 'num'), P('smooth', 'Smoothing', 'num')],
+    P('radius', 'Corner radius', 'num'), P('glowBorder', 'Neon border', 'bool'), P('warnHi', 'Warn above', 'num'), P('warnLo', 'Warn below', 'num'), P('smooth', 'Smoothing', 'num')],
   draw(ctx, w, v, skin) {
     const font = RD.fontOf(w.font, skin);
     if (w.panel && w.panel !== 'none') { ctx.fillStyle = RD.col(w.panel, skin); RD.rr(ctx, w.x, w.y, w.w, w.h, w.radius); ctx.fill(); }
-    if (w.border && w.border !== 'none') { ctx.strokeStyle = RD.col(w.border, skin); ctx.lineWidth = 2; RD.rr(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, w.radius); ctx.stroke(); }
+    if (w.border && w.border !== 'none') {
+      if (w.glowBorder) RD.glowStroke(ctx, () => RD.rr(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, w.radius), RD.col(w.border, skin), 2, 1);
+      else { ctx.strokeStyle = RD.col(w.border, skin); ctx.lineWidth = 2; RD.rr(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, w.radius); ctx.stroke(); }
+    }
     const label = w.label === '' || w.label == null ? (RD.CH[w.src] || {}).label || '' : w.label;
     const hasL = label && label !== '-';
     const pad = w.h * 0.08, lh = hasL ? w.h * 0.2 : 0;
@@ -588,7 +590,7 @@ RD.WT.shift = {
       const p = i / n;
       let c = p < 0.5 ? w.c1 : p < 0.8 ? w.c2 : w.c3; if (flashing) c = w.flash;
       ctx.fillStyle = lit ? RD.col(c, skin) : RD.col(w.off, skin);
-      if (lit && RD.hq) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12; }
+      if (lit && RD.settings.quality === 'high') { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12; }
       const cx = w.x + cell * (i + 0.5), cy = w.y + w.h / 2, s = Math.min(cell, w.h) * 0.8;
       ctx.beginPath();
       if (w.shape === 'circle') ctx.arc(cx, cy, s / 2, 0, 7);
@@ -668,7 +670,7 @@ RD.WT.gmeter = {
     const x = cx + RD.clamp(gx / mg, -1, 1) * r, y = cy - RD.clamp(gy / mg, -1, 1) * r;
     const tr = RD.gTrail; ctx.fillStyle = RD.col(w.dot, skin);
     for (let i = 0; i < tr.length; i++) { ctx.globalAlpha = i / tr.length * 0.4; ctx.beginPath(); ctx.arc(cx + RD.clamp(tr[i][0] / mg, -1, 1) * r, cy - RD.clamp(tr[i][1] / mg, -1, 1) * r, 3, 0, 7); ctx.fill(); }
-    ctx.globalAlpha = 1; if (RD.hq) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 14; }
+    ctx.globalAlpha = 1; if (RD.settings.quality === 'high') { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 14; }
     ctx.beginPath(); ctx.arc(x, y, Math.max(6, r * 0.07), 0, 7); ctx.fill(); ctx.shadowBlur = 0;
     const tot = Math.sqrt(gx * gx + gy * gy);
     RD.text(ctx, tot.toFixed(2) + 'g', w.x + w.w - 4, w.y + 12, 14, { color: RD.col(w.text, skin), align: 'right', weight: 800 });
@@ -765,6 +767,130 @@ RD.shade = (c, amt) => {
   } else if ((m = /rgba?\(([^)]+)\)/.exec(c))) { [r, g, b] = m[1].split(',').map(Number); } else return c;
   const f = (x) => Math.round(amt < 0 ? x * (1 + amt) : x + (255 - x) * amt);
   return (RD._shadeC[key] = 'rgb(' + f(r) + ',' + f(g) + ',' + f(b) + ')');
+};
+
+/* ===== EFFECTS: cheap neon glow, LED ring-light widget, animated backgrounds ===== */
+'use strict';
+/* Neon glow without shadowBlur: stroke the same path 3x (wide+faint → narrow+bright).
+   ~3 GPU strokes instead of a CPU gaussian blur — runs fine on old tablets. */
+RD.glowStroke = (ctx, path, color, width, level) => {
+  level = level == null ? 1 : level;
+  ctx.strokeStyle = color;
+  if (level > 0) {
+    ctx.globalAlpha = 0.10 * level; ctx.lineWidth = width * 3.4; path(); ctx.stroke();
+    ctx.globalAlpha = 0.22 * level; ctx.lineWidth = width * 2; path(); ctx.stroke();
+  }
+  ctx.globalAlpha = 1; ctx.lineWidth = width; path(); ctx.stroke();
+};
+RD.anyGlow = (skin) => skin && skin.glow;
+
+/* ----- LED ring light gauge ----- */
+RD.WT.ring = {
+  name: 'Ring Light Gauge',
+  def: { w: 420, h: 420, src: 'speed', min: 0, max: 160, start: 120, sweep: 300, segs: 48, thick: 0.075, gap: 0.3, t1: 0.6, t2: 0.85,
+    c1: '@primary', c2: '@accent', c3: '@warn', track: '@track', glow: true, comet: false, inner: true, showValue: true, valueSize: 0.42, label: '', font: '@', smooth: 6 },
+  props: [P('src', 'Data', 'ch'), P('min', 'Min', 'num'), P('max', 'Max', 'num'), P('start', 'Start angle', 'num'), P('sweep', 'Sweep (360 = full ring)', 'num'),
+    P('segs', 'LED count (0 = smooth)', 'num'), P('thick', 'Thickness', 'num'), P('gap', 'LED gap', 'num'), P('t1', 'Colour 2 from', 'num'), P('t2', 'Colour 3 from', 'num'),
+    ...COLORS(['c1', 'Colour 1'], ['c2', 'Colour 2'], ['c3', 'Colour 3'], ['track', 'Track']), P('glow', 'Neon glow', 'bool'), P('comet', 'Orbiting light', 'bool'),
+    P('inner', 'Inner halo ring', 'bool'), P('showValue', 'Show value', 'bool'), P('valueSize', 'Value size', 'num'), P('label', 'Label', 'text'), P('font', 'Font', 'font'), P('smooth', 'Smoothing', 'num')],
+  draw(ctx, w, v, skin) {
+    const r = Math.min(w.w, w.h) / 2 * 0.86, th = r * w.thick, a0 = w.start * D2R, sw = w.sweep * D2R, f = RD.frac(w, v);
+    const n = Math.max(0, w.segs | 0);
+    RD.cached(ctx, w, skin, 'ring', (c) => {
+      const cx = w.w / 2, cy = w.h / 2;
+      c.lineCap = 'butt';
+      c.strokeStyle = RD.col(w.track, skin); c.lineWidth = th;
+      if (n) { const step = sw / n, g = step * w.gap; for (let i = 0; i < n; i++) { c.beginPath(); c.arc(cx, cy, r, a0 + i * step + g / 2, a0 + (i + 1) * step - g / 2); c.stroke(); } }
+      else { c.beginPath(); c.arc(cx, cy, r, a0, a0 + sw); c.stroke(); }
+      if (w.inner) {
+        const ic = RD.col(w.c1, skin);
+        c.globalAlpha = 0.18; c.strokeStyle = ic; c.lineWidth = r * 0.012; c.beginPath(); c.arc(cx, cy, r * 0.8, 0, 7); c.stroke();
+        c.globalAlpha = 0.07; c.lineWidth = r * 0.05; c.beginPath(); c.arc(cx, cy, r * 0.8, 0, 7); c.stroke();
+        c.globalAlpha = 0.12; c.lineWidth = r * 0.006; c.beginPath(); c.arc(cx, cy, r * 1.12, 0, 7); c.stroke();
+        c.globalAlpha = 1;
+      }
+      if (w.label) RD.text(c, w.label, cx, cy - r * 0.42, r * 0.1, { color: RD.col('@dim', skin), align: 'center', weight: 800 });
+    });
+    const cx = w.x + w.w / 2, cy = w.y + w.h / 2, lvl = w.glow ? 1 : 0;
+    ctx.lineCap = 'butt';
+    if (f > 0.001) {
+      const groups = [[], [], []];
+      if (n) {
+        const step = sw / n, g = step * w.gap, lit = Math.round(f * n);
+        for (let i = 0; i < lit; i++) { const p = i / n; groups[p >= w.t2 ? 2 : p >= w.t1 ? 1 : 0].push([a0 + i * step + g / 2, a0 + (i + 1) * step - g / 2]); }
+      } else {
+        const e = a0 + sw * f, b1 = a0 + sw * Math.min(f, w.t1), b2 = a0 + sw * Math.min(f, w.t2);
+        groups[0].push([a0, b1]); if (f > w.t1) groups[1].push([b1, b2]); if (f > w.t2) groups[2].push([b2, e]);
+      }
+      [w.c1, w.c2, w.c3].forEach((col, gi) => {
+        const arcs = groups[gi]; if (!arcs.length) return;
+        RD.glowStroke(ctx, () => { ctx.beginPath(); arcs.forEach(a => { ctx.moveTo(cx + Math.cos(a[0]) * r, cy + Math.sin(a[0]) * r); ctx.arc(cx, cy, r, a[0], a[1]); }); }, RD.col(col, skin), th, lvl);
+      });
+    }
+    if (w.comet) {
+      const t = performance.now() / 1000, spd = 0.35 + f * 2.2, base = (t * spd) % (Math.PI * 2), col = RD.col(f >= w.t2 ? w.c3 : w.c1, skin);
+      ctx.fillStyle = col;
+      for (let k = 0; k < 7; k++) {
+        const a = base - k * 0.06, rr = r * 1.12;
+        ctx.globalAlpha = (1 - k / 7) * 0.85; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, r * (0.022 - k * 0.0022), 0, 7); ctx.fill();
+      }
+      ctx.globalAlpha = 0.12; ctx.beginPath(); ctx.arc(cx + Math.cos(base) * r * 1.12, cy + Math.sin(base) * r * 1.12, r * 0.07, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    if (w.showValue) {
+      const font = RD.fontOf(w.font, skin), col = RD.col('@text', skin);
+      RD.text(ctx, RD.fmt(w.src, v, w.dec), cx, cy + r * 0.02, r * w.valueSize, { font, color: col, align: 'center', weight: 800, glow: w.glow ? RD.col(w.c1, skin) : null, ghost: font === 'seg7' ? RD.col('@ghost', skin) : null });
+      RD.text(ctx, RD.unitFor(w.src), cx, cy + r * w.valueSize * 0.78, r * 0.1, { color: RD.col('@dim', skin), align: 'center', weight: 700 });
+    }
+  }
+};
+
+/* ----- Animated background overlays (drawn over the cached base each frame) ----- */
+RD.fx = { stars: null, rain: null, cols: null };
+RD.bgFx = (ctx, skin, W, H, still) => {
+  const b = skin.bg || {}, fx = b.fx; if (!fx) return;
+  if (!still && (!RD.settings.bgAnim || RD.noCache)) return;
+  if (still && fx === 'scan') return;
+  const t = still ? 7.3 : performance.now() / 1000, c1 = RD.col('@primary', skin), c2 = RD.col('@accent', skin);
+  ctx.save();
+  if (fx === 'grid') {
+    const hz = H * 0.66, spd = 0.25 + Math.min(1, (RD.data.speed || 0) / 120) * 1.2;
+    ctx.strokeStyle = c2; ctx.lineWidth = Math.max(1, H / 500);
+    const off = (t * spd) % 1;
+    for (let i = 0; i < 12; i++) { const p = (i + off) / 12, y = hz + (H - hz) * p * p; ctx.globalAlpha = 0.08 + p * 0.35; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.globalAlpha = 0.25;
+    for (let i = -14; i <= 14; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * W * 0.015, hz); ctx.lineTo(W / 2 + i * W * 0.11, H); ctx.stroke(); }
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = c1; ctx.lineWidth = Math.max(1.5, H / 300); ctx.beginPath(); ctx.moveTo(0, hz); ctx.lineTo(W, hz); ctx.stroke();
+  } else if (fx === 'stars') {
+    if (!RD.fx.stars) { RD.fx.stars = Array.from({ length: 110 }, () => [Math.random(), Math.random(), Math.random() * 6.28, 0.4 + Math.random() * 1.4]); }
+    ctx.fillStyle = '#fff';
+    for (const s of RD.fx.stars) { ctx.globalAlpha = 0.25 + 0.6 * (0.5 + 0.5 * Math.sin(t * s[3] + s[2])); const z = s[3] * H / 600; ctx.fillRect(s[0] * W, s[1] * H, z, z); }
+  } else if (fx === 'aurora') {
+    [[c1, 0.3, 0.12], [c2, 0.7, 0.09]].forEach(([c, x0, sp], i) => {
+      const x = W * (x0 + Math.sin(t * sp + i * 2) * 0.18), y = H * (0.3 + Math.cos(t * sp * 0.8 + i) * 0.12), rad = Math.max(W, H) * 0.42;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad); g.addColorStop(0, c); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 0.16; ctx.fillStyle = g; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    });
+  } else if (fx === 'rain') {
+    if (!RD.fx.rain || RD.fx.rainC !== c1) {
+      const cv = document.createElement('canvas'), ch = 24, rows = 22; cv.width = 28; cv.height = ch * rows; const x = cv.getContext('2d');
+      x.font = 'bold 20px monospace'; x.textAlign = 'center';
+      for (let i = 0; i < rows; i++) { x.globalAlpha = Math.pow(i / rows, 2); x.fillStyle = i === rows - 1 ? '#e8ffe8' : c1; x.fillText(String.fromCharCode(0x30A0 + Math.random() * 96 | 0), 14, i * ch + 20); }
+      RD.fx.rain = cv; RD.fx.rainC = c1; RD.fx.cols = null;
+    }
+    const cw = Math.max(18, W / 48), sc = cw / 28, n = Math.ceil(W / cw);
+    if (!RD.fx.cols || RD.fx.cols.length !== n) RD.fx.cols = Array.from({ length: n }, () => [Math.random() * H * 2, 60 + Math.random() * 140]);
+    ctx.globalAlpha = 0.35;
+    RD.fx.cols.forEach((c, i) => { c[0] += c[1] / 60; if (c[0] > H + RD.fx.rain.height * sc) c[0] = -Math.random() * H * 0.5; ctx.drawImage(RD.fx.rain, i * cw, c[0] - RD.fx.rain.height * sc, cw, RD.fx.rain.height * sc); });
+  } else if (fx === 'pulse') {
+    const s = Math.min(1, (RD.data.speed || 0) / 120), p = 0.5 + 0.5 * Math.sin(t * (1.2 + s * 3)), rad = Math.min(W, H) * (0.42 + p * 0.05);
+    const g = ctx.createRadialGradient(W / 2, H * 0.45, rad * 0.2, W / 2, H * 0.45, rad); g.addColorStop(0, c1); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.08 + p * 0.07 + s * 0.06; ctx.fillStyle = g; ctx.fillRect(W / 2 - rad, H * 0.45 - rad, rad * 2, rad * 2);
+  } else if (fx === 'scan') {
+    const y = ((t * 0.18) % 1) * H; const g = ctx.createLinearGradient(0, y - H * 0.08, 0, y);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, c1); ctx.globalAlpha = 0.12; ctx.fillStyle = g; ctx.fillRect(0, y - H * 0.08, W, H * 0.08);
+  }
+  ctx.restore();
 };
 
 /* ===== DATA SOURCES, DERIVED VALUES, ALERTS, PERFORMANCE ===== */
@@ -1354,59 +1480,7 @@ RD.pTripScreen = () => ({
     W('digital', 860, 540, 380, 150, { src: 'speed', label: 'Now', panel: '@panel', border: '@line' })
   ]
 });
-RD.PASSENGER_IDS = ['pglass', 'pnight', 'pmini'];
-RD.BUILTIN = [
-  {
-    id: 'pglass', name: 'Passenger Glass', font: 'sans', glow: true, passenger: true,
-    bg: { type: 'radial', c1: '#13243d', c2: '#03060c' },
-    pal: { primary: '#5ac8ff', accent: '#b388ff', warn: '#ff5c7a', text: '#ffffff', dim: '#8aa0bd', track: '#1a2a40', face: 'none', ring: '#2c4060', panel: 'rgba(30,50,80,0.4)', line: '#24364f', ghost: 'rgba(90,200,255,0.06)' },
-    screens: [{
-      name: 'Cruise', widgets: [
-        W('text', 40, 30, 360, 80, { text: '{clock}', size: 68, align: 'left', weight: '700' }),
-        W('text', 42, 108, 360, 36, { text: '{date}', size: 22, align: 'left', color: '@dim', weight: '600' }),
-        W('compass', 880, 40, 360, 64, { panel: '@panel' }),
-        W('radial', 390, 30, 500, 500, { src: 'speed', min: 0, max: 160, red: '', numDiv: 1, mode: 'arcOnly', start: 150, sweep: 240, face: 'none', ringW: 0, label: '', sub: '', showValue: false, arcW: 0.06 }),
-        W('digital', 470, 160, 340, 230, { src: 'speed', label: '-' }),
-        W('text', 470, 400, 340, 36, { text: 'SPEED', size: 18, color: '@dim', weight: '800' }),
-        W('gmeter', 60, 190, 280, 280, { maxG: 1 }),
-        W('digital', 950, 150, 290, 140, { src: 'altitude', panel: '@panel', border: '@line' }),
-        W('digital', 950, 305, 290, 140, { src: 'heading', label: 'Heading', panel: '@panel', border: '@line' }),
-        ...[['tripDist', 'Trip'], ['tripTime', 'Drive time'], ['avgSpeed', 'Average'], ['maxSpeed', 'Top speed']].map((c, i) =>
-          W('digital', 40 + i * 305, 560, 290, 130, { src: c[0], label: c[1], panel: '@panel', border: '@line', dec: c[0] === 'tripDist' ? 1 : '' }))
-      ]
-    }, RD.pTripScreen(), RD.gScreen()]
-  },
-  {
-    id: 'pnight', name: 'Night Cruise', font: 'seg7', glow: true, passenger: true,
-    bg: { type: 'solid', c1: '#050302' },
-    pal: { primary: '#ff9f1a', accent: '#ffcf70', warn: '#ff3b1a', text: '#ffb347', dim: '#7a5320', track: '#241606', face: 'none', ring: '#3a2408', panel: 'rgba(40,24,4,0.35)', line: '#3a2408', ghost: 'rgba(255,159,26,0.07)' },
-    screens: [{
-      name: 'Night', widgets: [
-        W('digital', 330, 100, 620, 330, { src: 'speed', label: '-' }),
-        W('bar', 330, 450, 620, 26, { src: 'speed', min: 0, max: 140, label: '', showValue: false, segs: 40, gap: 0.35, radius: 1, t1: 0.7, t2: 0.85 }),
-        W('text', 40, 40, 400, 70, { text: '{clock}', size: 60, align: 'left', font: 'seg7' }),
-        W('compass', 880, 40, 360, 64, {}),
-        W('digital', 60, 540, 360, 140, { src: 'tripDist', label: 'Trip' }),
-        W('digital', 460, 540, 360, 140, { src: 'tripTime', label: 'Time', showUnit: false }),
-        W('digital', 860, 540, 360, 140, { src: 'altitude', label: 'Alt' })
-      ]
-    }, RD.pTripScreen(), RD.gScreen()]
-  },
-  {
-    id: 'pmini', name: 'Minimal Speed', font: 'sans', glow: false, passenger: true,
-    bg: { type: 'solid', c1: '#000' },
-    pal: { primary: '#ffffff', accent: '#bdbdbd', warn: '#ff453a', text: '#ffffff', dim: '#6e6e6e', track: '#1c1c1c', face: 'none', ring: '#333', panel: '#0c0c0c', line: '#222', ghost: 'rgba(255,255,255,0.04)' },
-    screens: [{
-      name: 'Clean', widgets: [
-        W('text', 40, 30, 400, 60, { text: '{clock}', size: 44, align: 'left', weight: '400' }),
-        W('text', 840, 30, 400, 60, { text: '{date}', size: 24, align: 'right', color: '@dim', weight: '400' }),
-        W('digital', 240, 130, 800, 400, { src: 'speed', label: '-', size: 1.1 }),
-        W('digital', 140, 580, 320, 110, { src: 'tripDist', label: 'Trip' }),
-        W('digital', 480, 580, 320, 110, { src: 'tripTime', label: 'Time', showUnit: false }),
-        W('digital', 820, 580, 320, 110, { src: 'avgSpeed', label: 'Average' })
-      ]
-    }, RD.pTripScreen(), RD.gScreen()]
-  },
+RD.ENGINE_SKINS = [
   {
     id: 'neon', name: 'Neon Pulse', font: 'wide', glow: true,
     bg: { type: 'radial', c1: '#0c1a38', c2: '#02040a' },
@@ -1630,6 +1704,92 @@ RD.BUILTIN = [
   }
 ];
 
+/* ===== PASSENGER / SECOND-SCREEN SKINS (GPS only) ===== */
+const TILE = (o) => Object.assign({ panel: '@panel', border: '@line' }, o.tile || {});
+const tiles4 = (o, y, h) => [['tripDist', 'Trip'], ['tripTime', 'Drive time'], ['avgSpeed', 'Average'], ['maxSpeed', 'Top speed']].map((c, i) =>
+  W('digital', 40 + i * 305, y, 290, h, Object.assign({ src: c[0], label: c[1], dec: c[0] === 'tripDist' ? 1 : '', showUnit: c[0] !== 'tripTime' }, TILE(o))));
+const RING = (o, x, y, sz, extra) => W('ring', x, y, sz, sz, Object.assign({ src: 'speed', min: 0, max: 160 }, o.ring || {}, extra || {}));
+const LAYOUT = {
+  center: (o) => [
+    W('text', 40, 30, 360, 80, { text: '{clock}', size: 64, align: 'left', weight: '700' }),
+    W('text', 42, 106, 360, 36, { text: '{date}', size: 22, align: 'left', color: '@dim' }),
+    W('compass', 880, 40, 360, 64, { panel: TILE(o).panel }),
+    RING(o, 400, 40, 480),
+    W('gmeter', 60, 180, 280, 280, { maxG: 1 }),
+    W('digital', 950, 150, 290, 140, Object.assign({ src: 'altitude' }, TILE(o))),
+    W('digital', 950, 305, 290, 140, Object.assign({ src: 'heading', label: 'Heading' }, TILE(o))),
+    ...tiles4(o, 560, 130)],
+  split: (o) => [
+    RING(o, 30, 60, 600),
+    W('text', 690, 40, 550, 90, { text: '{clock}', size: 80, align: 'left', weight: '700' }),
+    W('text', 694, 128, 550, 36, { text: '{date}', size: 24, align: 'left', color: '@dim' }),
+    W('compass', 690, 180, 550, 70, { panel: TILE(o).panel }),
+    W('digital', 690, 270, 270, 150, Object.assign({ src: 'tripDist', label: 'Trip', dec: 1 }, TILE(o))),
+    W('digital', 970, 270, 270, 150, Object.assign({ src: 'tripTime', label: 'Drive time', showUnit: false }, TILE(o))),
+    W('digital', 690, 435, 270, 150, Object.assign({ src: 'avgSpeed', label: 'Average' }, TILE(o))),
+    W('digital', 970, 435, 270, 150, Object.assign({ src: 'maxSpeed', label: 'Top speed' }, TILE(o))),
+    W('bar', 690, 615, 550, 40, { src: 'speed', min: 0, max: 160, label: '', showValue: false, segs: 32, gap: 0.3, radius: 2 })],
+  minimal: (o) => [
+    W('text', 40, 30, 400, 60, { text: '{clock}', size: 44, align: 'left', weight: '400' }),
+    W('text', 840, 30, 400, 60, { text: '{date}', size: 24, align: 'right', color: '@dim', weight: '400' }),
+    W('digital', 240, 110, 800, 390, { src: 'speed', label: '-', size: 1.1 }),
+    W('bar', 340, 520, 600, 16, { src: 'speed', min: 0, max: 160, label: '', showValue: false, segs: 50, gap: 0.35, radius: 1 }),
+    W('digital', 140, 580, 320, 110, { src: 'tripDist', label: 'Trip', dec: 1 }),
+    W('digital', 480, 580, 320, 110, { src: 'tripTime', label: 'Time', showUnit: false }),
+    W('digital', 820, 580, 320, 110, { src: 'avgSpeed', label: 'Average' })],
+  dual: (o) => [
+    W('text', 40, 20, 400, 60, { text: '{clock}', size: 48, align: 'left', weight: '700' }),
+    W('text', 840, 20, 400, 60, { text: '{date}', size: 24, align: 'right', color: '@dim' }),
+    RING(o, 60, 100, 520),
+    RING(o, 700, 100, 520, { src: 'heading', min: 0, max: 360, start: -90, sweep: 360, segs: 36, t1: 2, t2: 2, label: 'HEADING', valueSize: 0.36 }),
+    W('text', 40, 645, 1200, 50, { text: '{tripDist} {tripDist:u}   ·   {tripTime}   ·   avg {avgSpeed} {avgSpeed:u}   ·   top {maxSpeed} {maxSpeed:u}', size: 26, color: '@dim', weight: '700' })],
+  halo: (o) => [
+    RING(o, 290, 10, 700, { start: -90, sweep: 360, valueSize: 0.5 }),
+    W('text', 40, 30, 300, 70, { text: '{clock}', size: 56, align: 'left', weight: '700' }),
+    W('text', 42, 100, 300, 36, { text: '{date}', size: 22, align: 'left', color: '@dim' }),
+    W('compass', 960, 40, 280, 56, {}),
+    W('digital', 40, 440, 240, 115, Object.assign({ src: 'tripDist', label: 'Trip', dec: 1 }, TILE(o))),
+    W('digital', 40, 570, 240, 115, Object.assign({ src: 'tripTime', label: 'Time', showUnit: false }, TILE(o))),
+    W('digital', 1000, 440, 240, 115, Object.assign({ src: 'avgSpeed', label: 'Average' }, TILE(o))),
+    W('digital', 1000, 570, 240, 115, Object.assign({ src: 'maxSpeed', label: 'Top' }, TILE(o)))]
+};
+const PSKIN = (o) => ({ id: o.id, name: o.name, font: o.font || 'sans', glow: o.glow !== false, passenger: true, bg: o.bg, pal: o.pal,
+  screens: [{ name: 'Cruise', widgets: LAYOUT[o.layout](o) }, RD.pTripScreen(), RD.gScreen()] });
+const PAL = (primary, accent, warn, text, dim, track, panel, line, extra) => Object.assign({ primary, accent, warn, text, dim, track, face: 'none', ring: line, panel, line, ghost: 'rgba(255,255,255,0.05)' }, extra || {});
+RD.PASSENGER_SKINS = [
+  { id: 'neonpulse', name: 'Neon Pulse', layout: 'center', font: 'wide', bg: { type: 'radial', c1: '#0b1838', c2: '#02030a', fx: 'pulse' },
+    pal: PAL('#00f0ff', '#ff2bd6', '#ff3b5c', '#effcff', '#6f8fb5', '#10213a', 'rgba(10,30,60,0.45)', '#1b3a60'), ring: { segs: 48, c2: '@accent', c3: '@warn' }, tile: { border: '#0a5a73', glowBorder: true } },
+  { id: 'ringlight', name: 'Ring Light', layout: 'halo', font: 'sans', bg: { type: 'radial', c1: '#0d1620', c2: '#020305' },
+    pal: PAL('#e9fdff', '#7df9ff', '#ff4d6d', '#ffffff', '#7c8ea0', '#141c26', 'rgba(255,255,255,0.04)', '#25313f'), ring: { segs: 90, thick: 0.045, gap: 0.45, t1: 0.75, t2: 0.9 } },
+  { id: 'cybergrid', name: 'Cyber Grid', layout: 'split', font: 'seg7', bg: { type: 'synth', c1: '#2b0a4a', c2: '#07020f', fx: 'grid' },
+    pal: PAL('#ff2fb9', '#29e0ff', '#ffde00', '#ffe9fb', '#b48bd6', 'rgba(80,30,120,0.55)', 'rgba(30,8,55,0.65)', '#5b2a8a', { ghost: 'rgba(255,47,185,0.08)' }), ring: { segs: 40, thick: 0.09 }, tile: { border: '#7a2c9a', glowBorder: true } },
+  { id: 'aurora', name: 'Aurora', layout: 'dual', font: 'sans', bg: { type: 'radial', c1: '#0b2430', c2: '#020608', fx: 'aurora' },
+    pal: PAL('#3dffb8', '#9d7bff', '#ff6b8b', '#eafff8', '#77a89a', '#0f2a2a', 'rgba(10,40,40,0.4)', '#1d4a44'), ring: { segs: 0, thick: 0.05, c2: '@accent' } },
+  { id: 'tron', name: 'Tron Lines', layout: 'center', font: 'wide', bg: { type: 'grid', c1: '#050c16', c2: '#02050a', fx: 'scan' },
+    pal: PAL('#2de2ff', '#ff9f1c', '#ff3b3b', '#e6fbff', '#5d86a3', '#0c1d2c', 'rgba(5,20,35,0.6)', '#1f6f8b'), ring: { segs: 0, thick: 0.035 }, tile: { border: '#1f8fb0', glowBorder: true } },
+  { id: 'lava', name: 'Lava Ring', layout: 'halo', font: 'wide', bg: { type: 'radial', c1: '#2a0b02', c2: '#060100', fx: 'pulse' },
+    pal: PAL('#ff6a00', '#ffd000', '#ff1f1f', '#fff1e0', '#a8704a', '#2a1206', 'rgba(60,20,4,0.4)', '#5a2a10'), ring: { segs: 60, thick: 0.06, c1: '@accent', c2: '@primary', c3: '@warn', t1: 0.5, t2: 0.8 } },
+  { id: 'ice', name: 'Ice', layout: 'minimal', font: 'sans', bg: { type: 'grad', c1: '#0e1d29', c2: '#03070b' },
+    pal: PAL('#bfefff', '#ffffff', '#ff6b8b', '#f2fbff', '#7b95a8', '#18283a', 'rgba(255,255,255,0.05)', '#2a3c4e'), glow: true },
+  { id: 'vapor', name: 'Vapor Sunset', layout: 'dual', font: 'sans', bg: { type: 'synth', c1: '#2a0b3d', c2: '#0a0214' },
+    pal: PAL('#ff71ce', '#01cdfe', '#fffb96', '#fff0fb', '#b98ad6', 'rgba(70,20,100,0.55)', 'rgba(40,10,60,0.5)', '#6a2f8f'), ring: { segs: 30, thick: 0.08 } },
+  { id: 'matrix', name: 'Matrix', layout: 'split', font: 'mono', bg: { type: 'solid', c1: '#000', fx: 'rain' },
+    pal: PAL('#00ff66', '#b3ffcc', '#ff3355', '#d9ffe6', '#2f8f55', '#032010', 'rgba(0,25,10,0.7)', '#0b4d26'), ring: { segs: 50, thick: 0.07, c2: '@primary', c3: '@accent' }, tile: { border: '#0f6b35', glowBorder: true } },
+  { id: 'halo', name: 'Halo', layout: 'halo', font: 'sans', glow: false, bg: { type: 'solid', c1: '#000' },
+    pal: PAL('#ffffff', '#cfcfcf', '#ff453a', '#ffffff', '#6e6e6e', '#151515', '#080808', '#1c1c1c'), ring: { segs: 0, thick: 0.018, glow: false } },
+  { id: 'nightcruise', name: 'Night Cruise', layout: 'minimal', font: 'seg7', bg: { type: 'solid', c1: '#050302' },
+    pal: PAL('#ff9f1a', '#ffcf70', '#ff3b1a', '#ffb347', '#7a5320', '#241606', 'rgba(40,24,4,0.35)', '#3a2408', { ghost: 'rgba(255,159,26,0.08)' }) },
+  { id: 'glass', name: 'Glass', layout: 'center', font: 'sans', bg: { type: 'radial', c1: '#13243d', c2: '#03060c' },
+    pal: PAL('#5ac8ff', '#b388ff', '#ff5c7a', '#ffffff', '#8aa0bd', '#1a2a40', 'rgba(30,50,80,0.4)', '#24364f'), ring: { segs: 0, thick: 0.05, c2: '@accent' } },
+  { id: 'daylight', name: 'Daylight', layout: 'center', font: 'sans', glow: false, bg: { type: 'grad', c1: '#f1f4f8', c2: '#dce2ea' },
+    pal: PAL('#0a63ff', '#00a37a', '#e01e37', '#0e1116', '#5b6573', '#d3dae3', '#ffffff', '#cfd6df', { ghost: 'rgba(0,0,0,0.05)' }), ring: { segs: 0, thick: 0.06, glow: false } },
+  { id: 'carbonred', name: 'Carbon Red', layout: 'split', font: 'wide', bg: { type: 'carbon', c1: '#161616', c2: '#0a0a0a' },
+    pal: PAL('#ff1e1e', '#ffffff', '#ff1e1e', '#ffffff', '#9a9a9a', '#2b2b2b', 'rgba(0,0,0,0.6)', '#3a3a3a'), ring: { segs: 36, thick: 0.08, c2: '#ff5a5a', c3: '#ffffff', t1: 0.7, t2: 0.9 } },
+  { id: 'galaxy', name: 'Galaxy', layout: 'halo', font: 'sans', bg: { type: 'radial', c1: '#160b2e', c2: '#020107', fx: 'stars' },
+    pal: PAL('#a78bfa', '#f0abfc', '#ff6b8b', '#f5f0ff', '#8b7bb0', '#1b1233', 'rgba(30,15,60,0.45)', '#3a2a66'), ring: { segs: 72, thick: 0.05, c2: '@accent' } }
+].map(PSKIN);
+RD.BUILTIN = RD.PASSENGER_SKINS.concat(RD.ENGINE_SKINS);
+
 /* normalise skin: fill widget defaults, ids */
 RD.normSkin = (s) => {
   s.screens.forEach(sc => sc.widgets.forEach(w => {
@@ -1647,8 +1807,8 @@ RD.normSkin = (s) => {
 };
 RD.BUILTIN.forEach(RD.normSkin);
 RD.userSkins = (RD.store.get('skins', []) || []).map(RD.normSkin);
-RD.allSkins = () => RD.BUILTIN.concat(RD.userSkins);
-RD.skinById = (id) => RD.allSkins().find(s => s.id === id) || RD.BUILTIN[0];
+RD.allSkins = () => (RD.passenger() ? RD.PASSENGER_SKINS : RD.ENGINE_SKINS).concat(RD.userSkins);
+RD.skinById = (id) => RD.BUILTIN.concat(RD.userSkins).find(s => s.id === id) || RD.allSkins()[0];
 RD.saveUserSkins = () => {
   const ok = RD.store.set('skins', RD.userSkins.map(s => { const c = RD.clone(s); c.screens.forEach(sc => sc.widgets.forEach(w => delete w._v)); return c; }));
   if (!ok) RD.toast('Storage full — export your skins and remove large images');
@@ -1664,7 +1824,7 @@ RD.editing = false;
 /* ---------- backgrounds ---------- */
 RD.bgCache = { k: '', c: null };
 RD.drawBg = (ctx, skin, W, H) => {
-  const k = skin.id + JSON.stringify(skin.bg) + W + 'x' + H;
+  const k = skin.id + JSON.stringify(skin.bg) + W + 'x' + H + (RD.settings.bgAnim ? 'a' : 's');
   if (RD.noCache || RD.bgCache.k !== k) {
     const c = RD.noCache ? null : document.createElement('canvas');
     let x = ctx;
@@ -1698,6 +1858,7 @@ RD.drawBg = (ctx, skin, W, H) => {
       for (let i = 0; i < 14; i++) { const y = hz + (H - hz) * Math.pow(i / 13, 2); x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); }
       for (let i = -20; i <= 20; i++) { x.beginPath(); x.moveTo(W / 2 + i * W * 0.012, hz); x.lineTo(W / 2 + i * W * 0.09, H); x.stroke(); }
     }
+    if (!RD.settings.bgAnim || RD.noCache) RD.bgFx(x, skin, W, H, true);
     if (c) RD.bgCache = { k, c };
   }
   if (!RD.noCache) ctx.drawImage(RD.bgCache.c, 0, 0, W, H);
@@ -1707,6 +1868,7 @@ RD.drawBg = (ctx, skin, W, H) => {
 RD.renderScreen = (ctx, skin, screen, devW, devH, s, ox, oy, dt) => {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   RD.drawBg(ctx, skin, devW, devH);
+  if (RD.settings.bgAnim && !RD.noCache) RD.bgFx(ctx, skin, devW, devH, false);
   ctx.setTransform(s, 0, 0, s, ox, oy);
   const scr = skin.screens[screen] || skin.screens[0];
   for (const w of scr.widgets) {
@@ -1715,8 +1877,10 @@ RD.renderScreen = (ctx, skin, screen, devW, devH, s, ox, oy, dt) => {
     if (v == null || isNaN(v)) v = 0;
     if (dt != null && w.smooth > 0) {
       const a = RD.anim[w.id]; const nv = a == null ? v : a + (v - a) * Math.min(1, dt * w.smooth);
+      if (Math.abs(nv - v) > Math.abs(v) * 0.002 + 0.01) RD._animating = true;
       RD.anim[w.id] = nv; v = nv;
     }
+    if (w.comet || (w.type === 'shift' && v >= w.to) || w.type === 'lamp' || (w.type === 'digital' && (w.warnHi !== '' || w.warnLo !== ''))) RD._animating = RD._animating || w.type !== 'digital' || RD._warnBlink;
     try { t.draw(ctx, w, v, skin); } catch (e) { if (!RD._errShown) { RD._errShown = 1; console.error(e); } }
   }
 };
@@ -1724,6 +1888,7 @@ RD.renderScreen = (ctx, skin, screen, devW, devH, s, ox, oy, dt) => {
 /* ---------- main stage ---------- */
 RD.view = { s: 1, ox: 0, oy: 0 };
 RD.layout = () => {
+  RD._dirty = true;
   const st = RD.$('#stage'), cv = RD.$('#cv');
   const r = st.getBoundingClientRect();
   const q = RD.settings.quality;
@@ -1735,7 +1900,7 @@ RD.layout = () => {
   RD.faceCache.clear(); RD.bgCache.k = '';
 };
 RD.skin = () => RD.skinById(RD.settings.skin);
-RD.setSkin = (id) => { RD.settings.skin = id; RD.settings.screen = 0; RD.saveSettings(); RD.faceCache.clear(); RD.anim = {}; RD.updateDots(); };
+RD.setSkin = (id) => { RD._dirty = true; RD.settings.skin = id; RD.settings.screen = 0; RD.saveSettings(); RD.faceCache.clear(); RD.anim = {}; RD.updateDots(); };
 RD.setScreen = (i) => {
   const n = RD.skin().screens.length; RD.settings.screen = ((i % n) + n) % n; RD.saveSettings(); RD.updateDots();
   const name = RD.skin().screens[RD.settings.screen].name; RD.flashName(name);
@@ -1747,7 +1912,7 @@ RD.updateDots = () => {
 };
 
 /* ---------- loop ---------- */
-RD.fps = 0; RD._frames = 0; RD._fpsT = 0; RD._last = 0; RD._alertT = 0; RD._slow = 0;
+RD._watch = ['speed', 'rpm', 'gear', 'heading', 'altitude', 'accelX', 'accelY', 'coolant', 'boost', 'volt', 'fuel', 'throttle', 'tripDist', 'tripTime', 'dtcCount']; RD.fps = 0; RD._frames = 0; RD._fpsT = 0; RD._last = 0; RD._alertT = 0; RD._slow = 0;
 RD.frame = (now) => {
   requestAnimationFrame(RD.frame);
   const modal = !!document.getElementById('modal');
@@ -1758,6 +1923,13 @@ RD.frame = (now) => {
   const t0 = performance.now();
   RD.derive(dt); RD.Trips.tick(dt);
   RD._alertT += dt; if (RD._alertT > 0.25) { RD._alertT = 0; RD.checkAlerts(); RD.updateHud(); }
+  /* Skip redraw when nothing visible changed (big battery/FPS saver on GPS dashboards) */
+  let key = RD.settings.skin + '|' + RD.settings.screen + '|' + Math.floor(Date.now() / 30000) + '|' + (RD.activeAlert ? 1 : 0);
+  for (const c of RD._watch) key += '|' + (Math.round((RD.data[c] || 0) * 10));
+  const force = RD._animating || RD.editing || RD.settings.bgAnim || key !== RD._lastKey || now - (RD._lastDraw || 0) > 1000 || RD._dirty;
+  RD._lastKey = key;
+  if (!force) return;
+  RD._lastDraw = now; RD._animating = false; RD._dirty = false;
   const cv = RD.$('#cv'), ctx = cv.getContext('2d'), v = RD.view, d = RD.dpr;
   RD.renderScreen(ctx, RD.skin(), RD.settings.screen, cv.width, cv.height, v.s * d, v.ox * d, v.oy * d, dt);
   if (RD.editing && RD.Editor) RD.Editor.overlay(ctx);

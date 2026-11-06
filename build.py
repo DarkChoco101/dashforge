@@ -1,6 +1,6 @@
 import pathlib
 root = pathlib.Path(__file__).parent / 'src'
-order = ['core.js', 'widgets.js', 'data.js', 'trips.js', 'skins.js', 'app.js', 'panels.js', 'editor.js']
+order = ['core.js', 'widgets.js', 'effects.js', 'data.js', 'trips.js', 'skins.js', 'app.js', 'panels.js', 'editor.js']
 js = '\n'.join((root / f).read_text() for f in order)
 html = (root / 'shell.html').read_text().replace('/*CSS*/', (root / 'style.css').read_text()).replace('/*JS*/', js)
 out = pathlib.Path(__file__).parent / 'www'

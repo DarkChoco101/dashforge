@@ -63,15 +63,16 @@ RD.seg7 = (ctx, str, x, y, h, color, align, ghost) => {
 
 /* ---------- text helper ---------- */
 RD.text = (ctx, str, x, y, px, o) => {
-  o = o || {}; const f = o.font || 'sans';
+  o = o || {}; let f = o.font || 'sans';
+  if (f === 'seg7' && /[^0-9\-\s.:NnRrPEFAbCcdHhLoOStUuy_°]/.test(str)) f = 'mono';
   if (f === 'seg7') { RD.seg7(ctx, str, x, y, px * 0.78, o.color || '#fff', o.align || 'left', o.ghost); return; }
   const fs = (o.italic ? 'italic ' : '') + (o.weight || 600) + ' ' + Math.max(1, px).toFixed(0) + 'px ' + (RD.FONTS[f] || RD.FONTS.sans);
   if (ctx._rdf !== fs) { ctx.font = fs; ctx._rdf = fs; }
   ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'middle';
   ctx.fillStyle = o.color || '#fff';
-  if (o.glow && RD.hq) { ctx.shadowColor = o.glow; ctx.shadowBlur = px * 0.35; }
+  if (o.glow && RD.settings.quality === 'high') { ctx.shadowColor = o.glow; ctx.shadowBlur = px * 0.35; ctx.fillText(str, x, y); ctx.shadowBlur = 0; return; }
+  if (o.glow) { ctx.globalAlpha = 0.16; ctx.strokeStyle = o.glow; ctx.lineWidth = Math.min(px * 0.07, 9); ctx.lineJoin = 'round'; ctx.strokeText(str, x, y); ctx.globalAlpha = 1; }
   ctx.fillText(str, x, y);
-  if (o.glow) ctx.shadowBlur = 0;
 };
 RD.measure = (ctx, str, px, f, weight) => {
   if (f === 'seg7') return RD.seg7Width(str, px * 0.78);
@@ -179,13 +180,11 @@ RD.WT.radial = {
     const hot = f >= redF;
     if (w.mode !== 'needle' && f > 0.001) {
       ctx.strokeStyle = hot ? RD.col(w.redC, skin) : RD.col(w.arc, skin); ctx.lineWidth = r * w.arcW; ctx.lineCap = 'butt';
-      if (w.glow && RD.hq) { ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = r * 0.12; }
-      ctx.beginPath(); ctx.arc(cx, cy, ar, a0, a0 + sw * f); ctx.stroke(); ctx.shadowBlur = 0;
+      RD.glowStroke(ctx, () => { ctx.beginPath(); ctx.arc(cx, cy, ar, a0, a0 + sw * f); }, ctx.strokeStyle, r * w.arcW, w.glow ? 0.8 : 0);
     }
     if (w.mode === 'needle' || w.mode === 'both') {
       const a = a0 + sw * f, ca = Math.cos(a), sa = Math.sin(a), nx = -sa, ny = ca, nw = r * 0.028;
       ctx.fillStyle = RD.col(w.needle, skin);
-      if (w.glow && RD.hq) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = r * 0.08; }
       ctx.beginPath(); ctx.moveTo(cx - ca * r * 0.16 + nx * nw, cy - sa * r * 0.16 + ny * nw); ctx.lineTo(cx + ca * r * 0.9, cy + sa * r * 0.9);
       ctx.lineTo(cx - ca * r * 0.16 - nx * nw, cy - sa * r * 0.16 - ny * nw); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
       ctx.fillStyle = RD.col('@ring', skin); ctx.beginPath(); ctx.arc(cx, cy, r * 0.075, 0, 7); ctx.fill();
@@ -253,11 +252,14 @@ RD.WT.digital = {
     panel: 'none', border: 'none', radius: 10, warnHi: '', warnLo: '', warnC: '@warn', size: 1, smooth: 0 },
   props: [P('src', 'Data', 'ch'), P('dec', 'Decimals (blank=auto)', 'num'), P('label', 'Label (blank=auto)', 'text'), P('showUnit', 'Show unit', 'bool'), P('align', 'Align', 'sel', ['left', 'center', 'right']),
     P('font', 'Font', 'font'), P('size', 'Text scale', 'num'), ...COLORS(['color', 'Value color'], ['labelC', 'Label color'], ['panel', 'Panel fill'], ['border', 'Border'], ['warnC', 'Warning color']),
-    P('radius', 'Corner radius', 'num'), P('warnHi', 'Warn above', 'num'), P('warnLo', 'Warn below', 'num'), P('smooth', 'Smoothing', 'num')],
+    P('radius', 'Corner radius', 'num'), P('glowBorder', 'Neon border', 'bool'), P('warnHi', 'Warn above', 'num'), P('warnLo', 'Warn below', 'num'), P('smooth', 'Smoothing', 'num')],
   draw(ctx, w, v, skin) {
     const font = RD.fontOf(w.font, skin);
     if (w.panel && w.panel !== 'none') { ctx.fillStyle = RD.col(w.panel, skin); RD.rr(ctx, w.x, w.y, w.w, w.h, w.radius); ctx.fill(); }
-    if (w.border && w.border !== 'none') { ctx.strokeStyle = RD.col(w.border, skin); ctx.lineWidth = 2; RD.rr(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, w.radius); ctx.stroke(); }
+    if (w.border && w.border !== 'none') {
+      if (w.glowBorder) RD.glowStroke(ctx, () => RD.rr(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, w.radius), RD.col(w.border, skin), 2, 1);
+      else { ctx.strokeStyle = RD.col(w.border, skin); ctx.lineWidth = 2; RD.rr(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, w.radius); ctx.stroke(); }
+    }
     const label = w.label === '' || w.label == null ? (RD.CH[w.src] || {}).label || '' : w.label;
     const hasL = label && label !== '-';
     const pad = w.h * 0.08, lh = hasL ? w.h * 0.2 : 0;
@@ -316,7 +318,7 @@ RD.WT.shift = {
       const p = i / n;
       let c = p < 0.5 ? w.c1 : p < 0.8 ? w.c2 : w.c3; if (flashing) c = w.flash;
       ctx.fillStyle = lit ? RD.col(c, skin) : RD.col(w.off, skin);
-      if (lit && RD.hq) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12; }
+      if (lit && RD.settings.quality === 'high') { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12; }
       const cx = w.x + cell * (i + 0.5), cy = w.y + w.h / 2, s = Math.min(cell, w.h) * 0.8;
       ctx.beginPath();
       if (w.shape === 'circle') ctx.arc(cx, cy, s / 2, 0, 7);
@@ -396,7 +398,7 @@ RD.WT.gmeter = {
     const x = cx + RD.clamp(gx / mg, -1, 1) * r, y = cy - RD.clamp(gy / mg, -1, 1) * r;
     const tr = RD.gTrail; ctx.fillStyle = RD.col(w.dot, skin);
     for (let i = 0; i < tr.length; i++) { ctx.globalAlpha = i / tr.length * 0.4; ctx.beginPath(); ctx.arc(cx + RD.clamp(tr[i][0] / mg, -1, 1) * r, cy - RD.clamp(tr[i][1] / mg, -1, 1) * r, 3, 0, 7); ctx.fill(); }
-    ctx.globalAlpha = 1; if (RD.hq) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 14; }
+    ctx.globalAlpha = 1; if (RD.settings.quality === 'high') { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 14; }
     ctx.beginPath(); ctx.arc(x, y, Math.max(6, r * 0.07), 0, 7); ctx.fill(); ctx.shadowBlur = 0;
     const tot = Math.sqrt(gx * gx + gy * gy);
     RD.text(ctx, tot.toFixed(2) + 'g', w.x + w.w - 4, w.y + 12, 14, { color: RD.col(w.text, skin), align: 'right', weight: 800 });

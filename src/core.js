@@ -13,7 +13,7 @@ RD.defaults = {
   units: 'metric', pressure: 'bar', ratios: '7.5,13,19,26,33,40', redline: 6500,
   night: false, brightness: 1, wake: true, fps: false, maxFps: 60, quality: 'auto',
   source: 'sim', skin: 'neon', screen: 0, tank: 45, fuelPrice: 105, volume: 0.6,
-  voice: true, obdFast: '0C,0D,11', obdSlow: '05,0F,04,0B,10,42,2F,0E,5C,46'
+  voice: true, bgAnim: false, obdFast: '0C,0D,11', obdSlow: '05,0F,04,0B,10,42,2F,0E,5C,46'
 };
 RD.settings = Object.assign({}, RD.defaults, RD.store.get('settings', {}));
 RD.saveSettings = () => RD.store.set('settings', RD.settings);

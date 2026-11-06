@@ -8,7 +8,7 @@ RD.editing = false;
 /* ---------- backgrounds ---------- */
 RD.bgCache = { k: '', c: null };
 RD.drawBg = (ctx, skin, W, H) => {
-  const k = skin.id + JSON.stringify(skin.bg) + W + 'x' + H;
+  const k = skin.id + JSON.stringify(skin.bg) + W + 'x' + H + (RD.settings.bgAnim ? 'a' : 's');
   if (RD.noCache || RD.bgCache.k !== k) {
     const c = RD.noCache ? null : document.createElement('canvas');
     let x = ctx;
@@ -42,6 +42,7 @@ RD.drawBg = (ctx, skin, W, H) => {
       for (let i = 0; i < 14; i++) { const y = hz + (H - hz) * Math.pow(i / 13, 2); x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); }
       for (let i = -20; i <= 20; i++) { x.beginPath(); x.moveTo(W / 2 + i * W * 0.012, hz); x.lineTo(W / 2 + i * W * 0.09, H); x.stroke(); }
     }
+    if (!RD.settings.bgAnim || RD.noCache) RD.bgFx(x, skin, W, H, true);
     if (c) RD.bgCache = { k, c };
   }
   if (!RD.noCache) ctx.drawImage(RD.bgCache.c, 0, 0, W, H);
@@ -51,6 +52,7 @@ RD.drawBg = (ctx, skin, W, H) => {
 RD.renderScreen = (ctx, skin, screen, devW, devH, s, ox, oy, dt) => {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   RD.drawBg(ctx, skin, devW, devH);
+  if (RD.settings.bgAnim && !RD.noCache) RD.bgFx(ctx, skin, devW, devH, false);
   ctx.setTransform(s, 0, 0, s, ox, oy);
   const scr = skin.screens[screen] || skin.screens[0];
   for (const w of scr.widgets) {
@@ -59,8 +61,10 @@ RD.renderScreen = (ctx, skin, screen, devW, devH, s, ox, oy, dt) => {
     if (v == null || isNaN(v)) v = 0;
     if (dt != null && w.smooth > 0) {
       const a = RD.anim[w.id]; const nv = a == null ? v : a + (v - a) * Math.min(1, dt * w.smooth);
+      if (Math.abs(nv - v) > Math.abs(v) * 0.002 + 0.01) RD._animating = true;
       RD.anim[w.id] = nv; v = nv;
     }
+    if (w.comet || (w.type === 'shift' && v >= w.to) || w.type === 'lamp' || (w.type === 'digital' && (w.warnHi !== '' || w.warnLo !== ''))) RD._animating = RD._animating || w.type !== 'digital' || RD._warnBlink;
     try { t.draw(ctx, w, v, skin); } catch (e) { if (!RD._errShown) { RD._errShown = 1; console.error(e); } }
   }
 };
@@ -68,6 +72,7 @@ RD.renderScreen = (ctx, skin, screen, devW, devH, s, ox, oy, dt) => {
 /* ---------- main stage ---------- */
 RD.view = { s: 1, ox: 0, oy: 0 };
 RD.layout = () => {
+  RD._dirty = true;
   const st = RD.$('#stage'), cv = RD.$('#cv');
   const r = st.getBoundingClientRect();
   const q = RD.settings.quality;
@@ -79,7 +84,7 @@ RD.layout = () => {
   RD.faceCache.clear(); RD.bgCache.k = '';
 };
 RD.skin = () => RD.skinById(RD.settings.skin);
-RD.setSkin = (id) => { RD.settings.skin = id; RD.settings.screen = 0; RD.saveSettings(); RD.faceCache.clear(); RD.anim = {}; RD.updateDots(); };
+RD.setSkin = (id) => { RD._dirty = true; RD.settings.skin = id; RD.settings.screen = 0; RD.saveSettings(); RD.faceCache.clear(); RD.anim = {}; RD.updateDots(); };
 RD.setScreen = (i) => {
   const n = RD.skin().screens.length; RD.settings.screen = ((i % n) + n) % n; RD.saveSettings(); RD.updateDots();
   const name = RD.skin().screens[RD.settings.screen].name; RD.flashName(name);
@@ -91,7 +96,7 @@ RD.updateDots = () => {
 };
 
 /* ---------- loop ---------- */
-RD.fps = 0; RD._frames = 0; RD._fpsT = 0; RD._last = 0; RD._alertT = 0; RD._slow = 0;
+RD._watch = ['speed', 'rpm', 'gear', 'heading', 'altitude', 'accelX', 'accelY', 'coolant', 'boost', 'volt', 'fuel', 'throttle', 'tripDist', 'tripTime', 'dtcCount']; RD.fps = 0; RD._frames = 0; RD._fpsT = 0; RD._last = 0; RD._alertT = 0; RD._slow = 0;
 RD.frame = (now) => {
   requestAnimationFrame(RD.frame);
   const modal = !!document.getElementById('modal');
@@ -102,6 +107,13 @@ RD.frame = (now) => {
   const t0 = performance.now();
   RD.derive(dt); RD.Trips.tick(dt);
   RD._alertT += dt; if (RD._alertT > 0.25) { RD._alertT = 0; RD.checkAlerts(); RD.updateHud(); }
+  /* Skip redraw when nothing visible changed (big battery/FPS saver on GPS dashboards) */
+  let key = RD.settings.skin + '|' + RD.settings.screen + '|' + Math.floor(Date.now() / 30000) + '|' + (RD.activeAlert ? 1 : 0);
+  for (const c of RD._watch) key += '|' + (Math.round((RD.data[c] || 0) * 10));
+  const force = RD._animating || RD.editing || RD.settings.bgAnim || key !== RD._lastKey || now - (RD._lastDraw || 0) > 1000 || RD._dirty;
+  RD._lastKey = key;
+  if (!force) return;
+  RD._lastDraw = now; RD._animating = false; RD._dirty = false;
   const cv = RD.$('#cv'), ctx = cv.getContext('2d'), v = RD.view, d = RD.dpr;
   RD.renderScreen(ctx, RD.skin(), RD.settings.screen, cv.width, cv.height, v.s * d, v.ox * d, v.oy * d, dt);
   if (RD.editing && RD.Editor) RD.Editor.overlay(ctx);

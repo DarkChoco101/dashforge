@@ -42,59 +42,7 @@ RD.pTripScreen = () => ({
     W('digital', 860, 540, 380, 150, { src: 'speed', label: 'Now', panel: '@panel', border: '@line' })
   ]
 });
-RD.PASSENGER_IDS = ['pglass', 'pnight', 'pmini'];
-RD.BUILTIN = [
-  {
-    id: 'pglass', name: 'Passenger Glass', font: 'sans', glow: true, passenger: true,
-    bg: { type: 'radial', c1: '#13243d', c2: '#03060c' },
-    pal: { primary: '#5ac8ff', accent: '#b388ff', warn: '#ff5c7a', text: '#ffffff', dim: '#8aa0bd', track: '#1a2a40', face: 'none', ring: '#2c4060', panel: 'rgba(30,50,80,0.4)', line: '#24364f', ghost: 'rgba(90,200,255,0.06)' },
-    screens: [{
-      name: 'Cruise', widgets: [
-        W('text', 40, 30, 360, 80, { text: '{clock}', size: 68, align: 'left', weight: '700' }),
-        W('text', 42, 108, 360, 36, { text: '{date}', size: 22, align: 'left', color: '@dim', weight: '600' }),
-        W('compass', 880, 40, 360, 64, { panel: '@panel' }),
-        W('radial', 390, 30, 500, 500, { src: 'speed', min: 0, max: 160, red: '', numDiv: 1, mode: 'arcOnly', start: 150, sweep: 240, face: 'none', ringW: 0, label: '', sub: '', showValue: false, arcW: 0.06 }),
-        W('digital', 470, 160, 340, 230, { src: 'speed', label: '-' }),
-        W('text', 470, 400, 340, 36, { text: 'SPEED', size: 18, color: '@dim', weight: '800' }),
-        W('gmeter', 60, 190, 280, 280, { maxG: 1 }),
-        W('digital', 950, 150, 290, 140, { src: 'altitude', panel: '@panel', border: '@line' }),
-        W('digital', 950, 305, 290, 140, { src: 'heading', label: 'Heading', panel: '@panel', border: '@line' }),
-        ...[['tripDist', 'Trip'], ['tripTime', 'Drive time'], ['avgSpeed', 'Average'], ['maxSpeed', 'Top speed']].map((c, i) =>
-          W('digital', 40 + i * 305, 560, 290, 130, { src: c[0], label: c[1], panel: '@panel', border: '@line', dec: c[0] === 'tripDist' ? 1 : '' }))
-      ]
-    }, RD.pTripScreen(), RD.gScreen()]
-  },
-  {
-    id: 'pnight', name: 'Night Cruise', font: 'seg7', glow: true, passenger: true,
-    bg: { type: 'solid', c1: '#050302' },
-    pal: { primary: '#ff9f1a', accent: '#ffcf70', warn: '#ff3b1a', text: '#ffb347', dim: '#7a5320', track: '#241606', face: 'none', ring: '#3a2408', panel: 'rgba(40,24,4,0.35)', line: '#3a2408', ghost: 'rgba(255,159,26,0.07)' },
-    screens: [{
-      name: 'Night', widgets: [
-        W('digital', 330, 100, 620, 330, { src: 'speed', label: '-' }),
-        W('bar', 330, 450, 620, 26, { src: 'speed', min: 0, max: 140, label: '', showValue: false, segs: 40, gap: 0.35, radius: 1, t1: 0.7, t2: 0.85 }),
-        W('text', 40, 40, 400, 70, { text: '{clock}', size: 60, align: 'left', font: 'seg7' }),
-        W('compass', 880, 40, 360, 64, {}),
-        W('digital', 60, 540, 360, 140, { src: 'tripDist', label: 'Trip' }),
-        W('digital', 460, 540, 360, 140, { src: 'tripTime', label: 'Time', showUnit: false }),
-        W('digital', 860, 540, 360, 140, { src: 'altitude', label: 'Alt' })
-      ]
-    }, RD.pTripScreen(), RD.gScreen()]
-  },
-  {
-    id: 'pmini', name: 'Minimal Speed', font: 'sans', glow: false, passenger: true,
-    bg: { type: 'solid', c1: '#000' },
-    pal: { primary: '#ffffff', accent: '#bdbdbd', warn: '#ff453a', text: '#ffffff', dim: '#6e6e6e', track: '#1c1c1c', face: 'none', ring: '#333', panel: '#0c0c0c', line: '#222', ghost: 'rgba(255,255,255,0.04)' },
-    screens: [{
-      name: 'Clean', widgets: [
-        W('text', 40, 30, 400, 60, { text: '{clock}', size: 44, align: 'left', weight: '400' }),
-        W('text', 840, 30, 400, 60, { text: '{date}', size: 24, align: 'right', color: '@dim', weight: '400' }),
-        W('digital', 240, 130, 800, 400, { src: 'speed', label: '-', size: 1.1 }),
-        W('digital', 140, 580, 320, 110, { src: 'tripDist', label: 'Trip' }),
-        W('digital', 480, 580, 320, 110, { src: 'tripTime', label: 'Time', showUnit: false }),
-        W('digital', 820, 580, 320, 110, { src: 'avgSpeed', label: 'Average' })
-      ]
-    }, RD.pTripScreen(), RD.gScreen()]
-  },
+RD.ENGINE_SKINS = [
   {
     id: 'neon', name: 'Neon Pulse', font: 'wide', glow: true,
     bg: { type: 'radial', c1: '#0c1a38', c2: '#02040a' },
@@ -318,6 +266,92 @@ RD.BUILTIN = [
   }
 ];
 
+/* ===== PASSENGER / SECOND-SCREEN SKINS (GPS only) ===== */
+const TILE = (o) => Object.assign({ panel: '@panel', border: '@line' }, o.tile || {});
+const tiles4 = (o, y, h) => [['tripDist', 'Trip'], ['tripTime', 'Drive time'], ['avgSpeed', 'Average'], ['maxSpeed', 'Top speed']].map((c, i) =>
+  W('digital', 40 + i * 305, y, 290, h, Object.assign({ src: c[0], label: c[1], dec: c[0] === 'tripDist' ? 1 : '', showUnit: c[0] !== 'tripTime' }, TILE(o))));
+const RING = (o, x, y, sz, extra) => W('ring', x, y, sz, sz, Object.assign({ src: 'speed', min: 0, max: 160 }, o.ring || {}, extra || {}));
+const LAYOUT = {
+  center: (o) => [
+    W('text', 40, 30, 360, 80, { text: '{clock}', size: 64, align: 'left', weight: '700' }),
+    W('text', 42, 106, 360, 36, { text: '{date}', size: 22, align: 'left', color: '@dim' }),
+    W('compass', 880, 40, 360, 64, { panel: TILE(o).panel }),
+    RING(o, 400, 40, 480),
+    W('gmeter', 60, 180, 280, 280, { maxG: 1 }),
+    W('digital', 950, 150, 290, 140, Object.assign({ src: 'altitude' }, TILE(o))),
+    W('digital', 950, 305, 290, 140, Object.assign({ src: 'heading', label: 'Heading' }, TILE(o))),
+    ...tiles4(o, 560, 130)],
+  split: (o) => [
+    RING(o, 30, 60, 600),
+    W('text', 690, 40, 550, 90, { text: '{clock}', size: 80, align: 'left', weight: '700' }),
+    W('text', 694, 128, 550, 36, { text: '{date}', size: 24, align: 'left', color: '@dim' }),
+    W('compass', 690, 180, 550, 70, { panel: TILE(o).panel }),
+    W('digital', 690, 270, 270, 150, Object.assign({ src: 'tripDist', label: 'Trip', dec: 1 }, TILE(o))),
+    W('digital', 970, 270, 270, 150, Object.assign({ src: 'tripTime', label: 'Drive time', showUnit: false }, TILE(o))),
+    W('digital', 690, 435, 270, 150, Object.assign({ src: 'avgSpeed', label: 'Average' }, TILE(o))),
+    W('digital', 970, 435, 270, 150, Object.assign({ src: 'maxSpeed', label: 'Top speed' }, TILE(o))),
+    W('bar', 690, 615, 550, 40, { src: 'speed', min: 0, max: 160, label: '', showValue: false, segs: 32, gap: 0.3, radius: 2 })],
+  minimal: (o) => [
+    W('text', 40, 30, 400, 60, { text: '{clock}', size: 44, align: 'left', weight: '400' }),
+    W('text', 840, 30, 400, 60, { text: '{date}', size: 24, align: 'right', color: '@dim', weight: '400' }),
+    W('digital', 240, 110, 800, 390, { src: 'speed', label: '-', size: 1.1 }),
+    W('bar', 340, 520, 600, 16, { src: 'speed', min: 0, max: 160, label: '', showValue: false, segs: 50, gap: 0.35, radius: 1 }),
+    W('digital', 140, 580, 320, 110, { src: 'tripDist', label: 'Trip', dec: 1 }),
+    W('digital', 480, 580, 320, 110, { src: 'tripTime', label: 'Time', showUnit: false }),
+    W('digital', 820, 580, 320, 110, { src: 'avgSpeed', label: 'Average' })],
+  dual: (o) => [
+    W('text', 40, 20, 400, 60, { text: '{clock}', size: 48, align: 'left', weight: '700' }),
+    W('text', 840, 20, 400, 60, { text: '{date}', size: 24, align: 'right', color: '@dim' }),
+    RING(o, 60, 100, 520),
+    RING(o, 700, 100, 520, { src: 'heading', min: 0, max: 360, start: -90, sweep: 360, segs: 36, t1: 2, t2: 2, label: 'HEADING', valueSize: 0.36 }),
+    W('text', 40, 645, 1200, 50, { text: '{tripDist} {tripDist:u}   ·   {tripTime}   ·   avg {avgSpeed} {avgSpeed:u}   ·   top {maxSpeed} {maxSpeed:u}', size: 26, color: '@dim', weight: '700' })],
+  halo: (o) => [
+    RING(o, 290, 10, 700, { start: -90, sweep: 360, valueSize: 0.5 }),
+    W('text', 40, 30, 300, 70, { text: '{clock}', size: 56, align: 'left', weight: '700' }),
+    W('text', 42, 100, 300, 36, { text: '{date}', size: 22, align: 'left', color: '@dim' }),
+    W('compass', 960, 40, 280, 56, {}),
+    W('digital', 40, 440, 240, 115, Object.assign({ src: 'tripDist', label: 'Trip', dec: 1 }, TILE(o))),
+    W('digital', 40, 570, 240, 115, Object.assign({ src: 'tripTime', label: 'Time', showUnit: false }, TILE(o))),
+    W('digital', 1000, 440, 240, 115, Object.assign({ src: 'avgSpeed', label: 'Average' }, TILE(o))),
+    W('digital', 1000, 570, 240, 115, Object.assign({ src: 'maxSpeed', label: 'Top' }, TILE(o)))]
+};
+const PSKIN = (o) => ({ id: o.id, name: o.name, font: o.font || 'sans', glow: o.glow !== false, passenger: true, bg: o.bg, pal: o.pal,
+  screens: [{ name: 'Cruise', widgets: LAYOUT[o.layout](o) }, RD.pTripScreen(), RD.gScreen()] });
+const PAL = (primary, accent, warn, text, dim, track, panel, line, extra) => Object.assign({ primary, accent, warn, text, dim, track, face: 'none', ring: line, panel, line, ghost: 'rgba(255,255,255,0.05)' }, extra || {});
+RD.PASSENGER_SKINS = [
+  { id: 'neonpulse', name: 'Neon Pulse', layout: 'center', font: 'wide', bg: { type: 'radial', c1: '#0b1838', c2: '#02030a', fx: 'pulse' },
+    pal: PAL('#00f0ff', '#ff2bd6', '#ff3b5c', '#effcff', '#6f8fb5', '#10213a', 'rgba(10,30,60,0.45)', '#1b3a60'), ring: { segs: 48, c2: '@accent', c3: '@warn' }, tile: { border: '#0a5a73', glowBorder: true } },
+  { id: 'ringlight', name: 'Ring Light', layout: 'halo', font: 'sans', bg: { type: 'radial', c1: '#0d1620', c2: '#020305' },
+    pal: PAL('#e9fdff', '#7df9ff', '#ff4d6d', '#ffffff', '#7c8ea0', '#141c26', 'rgba(255,255,255,0.04)', '#25313f'), ring: { segs: 90, thick: 0.045, gap: 0.45, t1: 0.75, t2: 0.9 } },
+  { id: 'cybergrid', name: 'Cyber Grid', layout: 'split', font: 'seg7', bg: { type: 'synth', c1: '#2b0a4a', c2: '#07020f', fx: 'grid' },
+    pal: PAL('#ff2fb9', '#29e0ff', '#ffde00', '#ffe9fb', '#b48bd6', 'rgba(80,30,120,0.55)', 'rgba(30,8,55,0.65)', '#5b2a8a', { ghost: 'rgba(255,47,185,0.08)' }), ring: { segs: 40, thick: 0.09 }, tile: { border: '#7a2c9a', glowBorder: true } },
+  { id: 'aurora', name: 'Aurora', layout: 'dual', font: 'sans', bg: { type: 'radial', c1: '#0b2430', c2: '#020608', fx: 'aurora' },
+    pal: PAL('#3dffb8', '#9d7bff', '#ff6b8b', '#eafff8', '#77a89a', '#0f2a2a', 'rgba(10,40,40,0.4)', '#1d4a44'), ring: { segs: 0, thick: 0.05, c2: '@accent' } },
+  { id: 'tron', name: 'Tron Lines', layout: 'center', font: 'wide', bg: { type: 'grid', c1: '#050c16', c2: '#02050a', fx: 'scan' },
+    pal: PAL('#2de2ff', '#ff9f1c', '#ff3b3b', '#e6fbff', '#5d86a3', '#0c1d2c', 'rgba(5,20,35,0.6)', '#1f6f8b'), ring: { segs: 0, thick: 0.035 }, tile: { border: '#1f8fb0', glowBorder: true } },
+  { id: 'lava', name: 'Lava Ring', layout: 'halo', font: 'wide', bg: { type: 'radial', c1: '#2a0b02', c2: '#060100', fx: 'pulse' },
+    pal: PAL('#ff6a00', '#ffd000', '#ff1f1f', '#fff1e0', '#a8704a', '#2a1206', 'rgba(60,20,4,0.4)', '#5a2a10'), ring: { segs: 60, thick: 0.06, c1: '@accent', c2: '@primary', c3: '@warn', t1: 0.5, t2: 0.8 } },
+  { id: 'ice', name: 'Ice', layout: 'minimal', font: 'sans', bg: { type: 'grad', c1: '#0e1d29', c2: '#03070b' },
+    pal: PAL('#bfefff', '#ffffff', '#ff6b8b', '#f2fbff', '#7b95a8', '#18283a', 'rgba(255,255,255,0.05)', '#2a3c4e'), glow: true },
+  { id: 'vapor', name: 'Vapor Sunset', layout: 'dual', font: 'sans', bg: { type: 'synth', c1: '#2a0b3d', c2: '#0a0214' },
+    pal: PAL('#ff71ce', '#01cdfe', '#fffb96', '#fff0fb', '#b98ad6', 'rgba(70,20,100,0.55)', 'rgba(40,10,60,0.5)', '#6a2f8f'), ring: { segs: 30, thick: 0.08 } },
+  { id: 'matrix', name: 'Matrix', layout: 'split', font: 'mono', bg: { type: 'solid', c1: '#000', fx: 'rain' },
+    pal: PAL('#00ff66', '#b3ffcc', '#ff3355', '#d9ffe6', '#2f8f55', '#032010', 'rgba(0,25,10,0.7)', '#0b4d26'), ring: { segs: 50, thick: 0.07, c2: '@primary', c3: '@accent' }, tile: { border: '#0f6b35', glowBorder: true } },
+  { id: 'halo', name: 'Halo', layout: 'halo', font: 'sans', glow: false, bg: { type: 'solid', c1: '#000' },
+    pal: PAL('#ffffff', '#cfcfcf', '#ff453a', '#ffffff', '#6e6e6e', '#151515', '#080808', '#1c1c1c'), ring: { segs: 0, thick: 0.018, glow: false } },
+  { id: 'nightcruise', name: 'Night Cruise', layout: 'minimal', font: 'seg7', bg: { type: 'solid', c1: '#050302' },
+    pal: PAL('#ff9f1a', '#ffcf70', '#ff3b1a', '#ffb347', '#7a5320', '#241606', 'rgba(40,24,4,0.35)', '#3a2408', { ghost: 'rgba(255,159,26,0.08)' }) },
+  { id: 'glass', name: 'Glass', layout: 'center', font: 'sans', bg: { type: 'radial', c1: '#13243d', c2: '#03060c' },
+    pal: PAL('#5ac8ff', '#b388ff', '#ff5c7a', '#ffffff', '#8aa0bd', '#1a2a40', 'rgba(30,50,80,0.4)', '#24364f'), ring: { segs: 0, thick: 0.05, c2: '@accent' } },
+  { id: 'daylight', name: 'Daylight', layout: 'center', font: 'sans', glow: false, bg: { type: 'grad', c1: '#f1f4f8', c2: '#dce2ea' },
+    pal: PAL('#0a63ff', '#00a37a', '#e01e37', '#0e1116', '#5b6573', '#d3dae3', '#ffffff', '#cfd6df', { ghost: 'rgba(0,0,0,0.05)' }), ring: { segs: 0, thick: 0.06, glow: false } },
+  { id: 'carbonred', name: 'Carbon Red', layout: 'split', font: 'wide', bg: { type: 'carbon', c1: '#161616', c2: '#0a0a0a' },
+    pal: PAL('#ff1e1e', '#ffffff', '#ff1e1e', '#ffffff', '#9a9a9a', '#2b2b2b', 'rgba(0,0,0,0.6)', '#3a3a3a'), ring: { segs: 36, thick: 0.08, c2: '#ff5a5a', c3: '#ffffff', t1: 0.7, t2: 0.9 } },
+  { id: 'galaxy', name: 'Galaxy', layout: 'halo', font: 'sans', bg: { type: 'radial', c1: '#160b2e', c2: '#020107', fx: 'stars' },
+    pal: PAL('#a78bfa', '#f0abfc', '#ff6b8b', '#f5f0ff', '#8b7bb0', '#1b1233', 'rgba(30,15,60,0.45)', '#3a2a66'), ring: { segs: 72, thick: 0.05, c2: '@accent' } }
+].map(PSKIN);
+RD.BUILTIN = RD.PASSENGER_SKINS.concat(RD.ENGINE_SKINS);
+
 /* normalise skin: fill widget defaults, ids */
 RD.normSkin = (s) => {
   s.screens.forEach(sc => sc.widgets.forEach(w => {
@@ -335,8 +369,8 @@ RD.normSkin = (s) => {
 };
 RD.BUILTIN.forEach(RD.normSkin);
 RD.userSkins = (RD.store.get('skins', []) || []).map(RD.normSkin);
-RD.allSkins = () => RD.BUILTIN.concat(RD.userSkins);
-RD.skinById = (id) => RD.allSkins().find(s => s.id === id) || RD.BUILTIN[0];
+RD.allSkins = () => (RD.passenger() ? RD.PASSENGER_SKINS : RD.ENGINE_SKINS).concat(RD.userSkins);
+RD.skinById = (id) => RD.BUILTIN.concat(RD.userSkins).find(s => s.id === id) || RD.allSkins()[0];
 RD.saveUserSkins = () => {
   const ok = RD.store.set('skins', RD.userSkins.map(s => { const c = RD.clone(s); c.screens.forEach(sc => sc.widgets.forEach(w => delete w._v)); return c; }));
   if (!ok) RD.toast('Storage full — export your skins and remove large images');
