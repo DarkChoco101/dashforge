@@ -73,7 +73,7 @@ RD.layout = () => {
   const q = RD.settings.quality;
   RD.dpr = Math.min(window.devicePixelRatio || 1, q === 'low' ? 1 : q === 'high' ? 2.5 : (RD.lowPerf ? 1 : 1.75));
   cv.width = Math.round(r.width * RD.dpr); cv.height = Math.round(r.height * RD.dpr);
-  cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
+  cv.getContext('2d')._rdf = null; cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
   const s = Math.min(r.width / RD.W, r.height / RD.H);
   RD.scale = s; RD.view = { s, ox: (r.width - RD.W * s) / 2, oy: (r.height - RD.H * s) / 2, rect: r };
   RD.faceCache.clear(); RD.bgCache.k = '';
@@ -94,7 +94,9 @@ RD.updateDots = () => {
 RD.fps = 0; RD._frames = 0; RD._fpsT = 0; RD._last = 0; RD._alertT = 0; RD._slow = 0;
 RD.frame = (now) => {
   requestAnimationFrame(RD.frame);
-  const minDt = 1000 / (RD.settings.maxFps || 60) - 1;
+  const modal = !!document.getElementById('modal');
+  const cap = modal ? 6 : (RD.lowPerf && RD.settings.quality === 'auto' ? Math.min(30, RD.settings.maxFps || 60) : (RD.settings.maxFps || 60));
+  const minDt = 1000 / cap - 1;
   if (now - RD._last < minDt) return;
   const dt = Math.min(0.1, (now - RD._last) / 1000 || 0.016); RD._last = now;
   const t0 = performance.now();
@@ -107,12 +109,12 @@ RD.frame = (now) => {
   if (al) { ab.textContent = '⚠ ' + al.msg; ab.classList.add('show'); RD.$('#stage').classList.toggle('alarm', Date.now() % 900 < 450); }
   else if (ab.classList.contains('show')) { ab.classList.remove('show'); RD.$('#stage').classList.remove('alarm'); }
   RD._frames++; RD._fpsT += dt;
-  const ft = performance.now() - t0; RD._slow = RD._slow * 0.95 + ft * 0.05;
+  const ft = performance.now() - t0; if (document.getElementById('modal')) return; RD._slow = RD._slow * 0.95 + ft * 0.05;
   if (RD._fpsT >= 1) {
     RD.fps = RD._frames / RD._fpsT; RD._frames = 0; RD._fpsT = 0;
     RD.$('#fps').textContent = RD.settings.fps ? RD.fps.toFixed(0) + ' fps · ' + RD._slow.toFixed(1) + ' ms' : '';
     if (RD.settings.quality === 'auto') {
-      if (!RD.lowPerf && (RD._slow > 22 || RD.fps < 24)) { RD.lowPerf = true; RD.hq = false; RD.layout(); }
+      if (!RD.lowPerf && !document.getElementById('modal') && (RD._slow > 20 || RD.fps < 30)) { RD.lowPerf = true; RD.hq = false; RD.layout(); }
     } else RD.hq = RD.settings.quality !== 'low';
   }
 };

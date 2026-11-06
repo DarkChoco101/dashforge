@@ -23,7 +23,7 @@ html,body{margin:0;height:100%;background:#000;color:#e8eef6;font:15px/1.4 syste
 .hud-on #hud *{pointer-events:auto}
 .hud-l{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .hud-r{display:flex;gap:8px}
-.hud-r button{width:52px;height:52px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(15,20,30,.78);color:#fff;font-size:22px;backdrop-filter:blur(6px);cursor:pointer}
+.hud-r button{width:52px;height:52px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(15,20,30,.78);color:#fff;font-size:22px;cursor:pointer}
 .hud-r button:active{transform:scale(.94)}
 .pill{padding:5px 11px;border-radius:99px;font-size:13px;font-weight:700;background:rgba(15,20,30,.8);border:1px solid rgba(255,255,255,.15)}
 .pill.ok{color:#5df2a0}.pill.warn{color:#ffd166}.pill.bad{color:#ff5c6c}.pill.rec{color:#ff5c6c}
@@ -55,7 +55,7 @@ textarea{width:100%;min-height:90px}
 .chk{display:inline-flex;gap:8px;align-items:center}
 .card{background:#111926;border:1px solid #233149;border-radius:14px;padding:14px;margin:12px 0}
 /* modal */
-.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(3px)}
+.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:50;}
 .modal{background:#0b111b;border:1px solid #233149;border-radius:20px;width:min(760px,94vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .modal.wide{width:min(1100px,96vw)}
 .modal header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #1d2a40}
@@ -281,7 +281,7 @@ RD.col = (c, skin) => {
   return c;
 };
 RD.fontOf = (f, skin) => (!f || f === '@') ? ((skin && skin.font) || 'sans') : f;
-RD.hq = true;
+RD.hq = true; RD._mc = {}; RD._mcN = 0;
 
 /* ---------- 7-segment renderer (no font files needed) ---------- */
 const SEG = {
@@ -332,7 +332,8 @@ RD.seg7 = (ctx, str, x, y, h, color, align, ghost) => {
 RD.text = (ctx, str, x, y, px, o) => {
   o = o || {}; const f = o.font || 'sans';
   if (f === 'seg7') { RD.seg7(ctx, str, x, y, px * 0.78, o.color || '#fff', o.align || 'left', o.ghost); return; }
-  ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 600) + ' ' + Math.max(1, px).toFixed(1) + 'px ' + (RD.FONTS[f] || RD.FONTS.sans);
+  const fs = (o.italic ? 'italic ' : '') + (o.weight || 600) + ' ' + Math.max(1, px).toFixed(0) + 'px ' + (RD.FONTS[f] || RD.FONTS.sans);
+  if (ctx._rdf !== fs) { ctx.font = fs; ctx._rdf = fs; }
   ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'middle';
   ctx.fillStyle = o.color || '#fff';
   if (o.glow && RD.hq) { ctx.shadowColor = o.glow; ctx.shadowBlur = px * 0.35; }
@@ -341,7 +342,9 @@ RD.text = (ctx, str, x, y, px, o) => {
 };
 RD.measure = (ctx, str, px, f, weight) => {
   if (f === 'seg7') return RD.seg7Width(str, px * 0.78);
-  ctx.font = (weight || 600) + ' ' + px + 'px ' + (RD.FONTS[f] || RD.FONTS.sans); return ctx.measureText(str).width;
+  const fs = (weight || 600) + ' ' + Math.max(1, px).toFixed(0) + 'px ' + (RD.FONTS[f] || RD.FONTS.sans);
+  if (ctx._rdf !== fs) { ctx.font = fs; ctx._rdf = fs; }
+  const k = fs + '|' + str; let m = RD._mc[k]; if (m == null) { m = ctx.measureText(str).width; if (RD._mcN++ > 4000) { RD._mc = {}; RD._mcN = 0; } RD._mc[k] = m; } return m;
 };
 RD.rr = (ctx, x, y, w, h, r) => {
   r = Math.max(0, Math.min(r || 0, w / 2, h / 2)); ctx.beginPath();
@@ -1656,7 +1659,7 @@ RD.layout = () => {
   const q = RD.settings.quality;
   RD.dpr = Math.min(window.devicePixelRatio || 1, q === 'low' ? 1 : q === 'high' ? 2.5 : (RD.lowPerf ? 1 : 1.75));
   cv.width = Math.round(r.width * RD.dpr); cv.height = Math.round(r.height * RD.dpr);
-  cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
+  cv.getContext('2d')._rdf = null; cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
   const s = Math.min(r.width / RD.W, r.height / RD.H);
   RD.scale = s; RD.view = { s, ox: (r.width - RD.W * s) / 2, oy: (r.height - RD.H * s) / 2, rect: r };
   RD.faceCache.clear(); RD.bgCache.k = '';
@@ -1677,7 +1680,9 @@ RD.updateDots = () => {
 RD.fps = 0; RD._frames = 0; RD._fpsT = 0; RD._last = 0; RD._alertT = 0; RD._slow = 0;
 RD.frame = (now) => {
   requestAnimationFrame(RD.frame);
-  const minDt = 1000 / (RD.settings.maxFps || 60) - 1;
+  const modal = !!document.getElementById('modal');
+  const cap = modal ? 6 : (RD.lowPerf && RD.settings.quality === 'auto' ? Math.min(30, RD.settings.maxFps || 60) : (RD.settings.maxFps || 60));
+  const minDt = 1000 / cap - 1;
   if (now - RD._last < minDt) return;
   const dt = Math.min(0.1, (now - RD._last) / 1000 || 0.016); RD._last = now;
   const t0 = performance.now();
@@ -1690,12 +1695,12 @@ RD.frame = (now) => {
   if (al) { ab.textContent = '⚠ ' + al.msg; ab.classList.add('show'); RD.$('#stage').classList.toggle('alarm', Date.now() % 900 < 450); }
   else if (ab.classList.contains('show')) { ab.classList.remove('show'); RD.$('#stage').classList.remove('alarm'); }
   RD._frames++; RD._fpsT += dt;
-  const ft = performance.now() - t0; RD._slow = RD._slow * 0.95 + ft * 0.05;
+  const ft = performance.now() - t0; if (document.getElementById('modal')) return; RD._slow = RD._slow * 0.95 + ft * 0.05;
   if (RD._fpsT >= 1) {
     RD.fps = RD._frames / RD._fpsT; RD._frames = 0; RD._fpsT = 0;
     RD.$('#fps').textContent = RD.settings.fps ? RD.fps.toFixed(0) + ' fps · ' + RD._slow.toFixed(1) + ' ms' : '';
     if (RD.settings.quality === 'auto') {
-      if (!RD.lowPerf && (RD._slow > 22 || RD.fps < 24)) { RD.lowPerf = true; RD.hq = false; RD.layout(); }
+      if (!RD.lowPerf && !document.getElementById('modal') && (RD._slow > 20 || RD.fps < 30)) { RD.lowPerf = true; RD.hq = false; RD.layout(); }
     } else RD.hq = RD.settings.quality !== 'low';
   }
 };

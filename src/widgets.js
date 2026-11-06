@@ -14,7 +14,7 @@ RD.col = (c, skin) => {
   return c;
 };
 RD.fontOf = (f, skin) => (!f || f === '@') ? ((skin && skin.font) || 'sans') : f;
-RD.hq = true;
+RD.hq = true; RD._mc = {}; RD._mcN = 0;
 
 /* ---------- 7-segment renderer (no font files needed) ---------- */
 const SEG = {
@@ -65,7 +65,8 @@ RD.seg7 = (ctx, str, x, y, h, color, align, ghost) => {
 RD.text = (ctx, str, x, y, px, o) => {
   o = o || {}; const f = o.font || 'sans';
   if (f === 'seg7') { RD.seg7(ctx, str, x, y, px * 0.78, o.color || '#fff', o.align || 'left', o.ghost); return; }
-  ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 600) + ' ' + Math.max(1, px).toFixed(1) + 'px ' + (RD.FONTS[f] || RD.FONTS.sans);
+  const fs = (o.italic ? 'italic ' : '') + (o.weight || 600) + ' ' + Math.max(1, px).toFixed(0) + 'px ' + (RD.FONTS[f] || RD.FONTS.sans);
+  if (ctx._rdf !== fs) { ctx.font = fs; ctx._rdf = fs; }
   ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'middle';
   ctx.fillStyle = o.color || '#fff';
   if (o.glow && RD.hq) { ctx.shadowColor = o.glow; ctx.shadowBlur = px * 0.35; }
@@ -74,7 +75,9 @@ RD.text = (ctx, str, x, y, px, o) => {
 };
 RD.measure = (ctx, str, px, f, weight) => {
   if (f === 'seg7') return RD.seg7Width(str, px * 0.78);
-  ctx.font = (weight || 600) + ' ' + px + 'px ' + (RD.FONTS[f] || RD.FONTS.sans); return ctx.measureText(str).width;
+  const fs = (weight || 600) + ' ' + Math.max(1, px).toFixed(0) + 'px ' + (RD.FONTS[f] || RD.FONTS.sans);
+  if (ctx._rdf !== fs) { ctx.font = fs; ctx._rdf = fs; }
+  const k = fs + '|' + str; let m = RD._mc[k]; if (m == null) { m = ctx.measureText(str).width; if (RD._mcN++ > 4000) { RD._mc = {}; RD._mcN = 0; } RD._mc[k] = m; } return m;
 };
 RD.rr = (ctx, x, y, w, h, r) => {
   r = Math.max(0, Math.min(r || 0, w / 2, h / 2)); ctx.beginPath();

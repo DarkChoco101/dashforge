@@ -10,7 +10,7 @@ html,body{margin:0;height:100%;background:#000;color:#e8eef6;font:15px/1.4 syste
 .hud-on #hud *{pointer-events:auto}
 .hud-l{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .hud-r{display:flex;gap:8px}
-.hud-r button{width:52px;height:52px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(15,20,30,.78);color:#fff;font-size:22px;backdrop-filter:blur(6px);cursor:pointer}
+.hud-r button{width:52px;height:52px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(15,20,30,.78);color:#fff;font-size:22px;cursor:pointer}
 .hud-r button:active{transform:scale(.94)}
 .pill{padding:5px 11px;border-radius:99px;font-size:13px;font-weight:700;background:rgba(15,20,30,.8);border:1px solid rgba(255,255,255,.15)}
 .pill.ok{color:#5df2a0}.pill.warn{color:#ffd166}.pill.bad{color:#ff5c6c}.pill.rec{color:#ff5c6c}
@@ -42,7 +42,7 @@ textarea{width:100%;min-height:90px}
 .chk{display:inline-flex;gap:8px;align-items:center}
 .card{background:#111926;border:1px solid #233149;border-radius:14px;padding:14px;margin:12px 0}
 /* modal */
-.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(3px)}
+.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:50;}
 .modal{background:#0b111b;border:1px solid #233149;border-radius:20px;width:min(760px,94vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .modal.wide{width:min(1100px,96vw)}
 .modal header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #1d2a40}
