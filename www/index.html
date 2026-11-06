@@ -1,0 +1,2390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>DashForge — Car Dashboard</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#000;color:#e8eef6;font:15px/1.4 system-ui,Roboto,"Segoe UI",sans-serif;overflow:hidden;overscroll-behavior:none}
+#app{display:flex;height:100vh;height:100dvh;width:100vw}
+#stage{position:relative;flex:1;min-width:0;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+#stage.alarm{box-shadow:inset 0 0 0 6px #ff2a2a}
+#cv{display:block;position:absolute;inset:0}
+#night{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .4s}
+#hud{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:flex-start;padding:10px 12px;pointer-events:none;opacity:0;transition:opacity .3s}
+.hud-on #hud{opacity:1}
+.hud-on #hud *{pointer-events:auto}
+.hud-l{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.hud-r{display:flex;gap:8px}
+.hud-r button{width:52px;height:52px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(15,20,30,.78);color:#fff;font-size:22px;backdrop-filter:blur(6px);cursor:pointer}
+.hud-r button:active{transform:scale(.94)}
+.pill{padding:5px 11px;border-radius:99px;font-size:13px;font-weight:700;background:rgba(15,20,30,.8);border:1px solid rgba(255,255,255,.15)}
+.pill.ok{color:#5df2a0}.pill.warn{color:#ffd166}.pill.bad{color:#ff5c6c}.pill.rec{color:#ff5c6c}
+#fps{font:12px monospace;color:#9fb0c8;background:rgba(0,0,0,.5);padding:2px 6px;border-radius:6px}
+#fps:empty{display:none}
+#dots{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:8px;padding:6px}
+#dots i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.25);cursor:pointer}
+#dots i.on{background:rgba(255,255,255,.85)}
+#scrname{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:32px;font-weight:800;padding:12px 26px;border-radius:16px;background:rgba(0,0,0,.6);opacity:0;transition:opacity .3s;pointer-events:none}
+#scrname.show{opacity:1}
+#alertbar{position:absolute;left:50%;top:70px;transform:translateX(-50%) translateY(-20px);background:#c4162a;color:#fff;font-weight:800;font-size:22px;padding:10px 26px;border-radius:14px;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
+#alertbar.show{opacity:1;transform:translateX(-50%)}
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(30px);background:rgba(20,26,38,.96);border:1px solid #2c3a52;color:#fff;padding:12px 20px;border-radius:12px;opacity:0;transition:.3s;z-index:100;pointer-events:none;max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%)}
+/* buttons & forms */
+.btn{background:#1d2738;color:#e8eef6;border:1px solid #2d3b54;border-radius:10px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;min-height:42px}
+.btn:active{transform:scale(.97)}.btn:disabled{opacity:.5}
+.btn.primary{background:#2563eb;border-color:#3b7bff}.btn.danger{background:#3a1520;border-color:#6b2232;color:#ff9aa8}.btn.ghost{background:transparent}
+.btn.sm{padding:6px 11px;min-height:34px;font-size:13px}.btn.big{font-size:20px;padding:14px 30px}.btn.on{background:#2563eb}
+.link{background:none;border:0;color:#6ea8ff;cursor:pointer;font:inherit;text-decoration:underline}
+input,select,textarea{background:#0f1622;color:#e8eef6;border:1px solid #2d3b54;border-radius:8px;padding:8px 10px;font:inherit;min-height:38px}
+input[type=checkbox]{min-height:auto;width:20px;height:20px;accent-color:#3b7bff}
+input[type=color]{padding:2px;width:46px;height:34px;min-height:34px}
+input[type=range]{padding:0;accent-color:#3b7bff}
+textarea{width:100%;min-height:90px}
+.row{display:flex;gap:10px;align-items:center;margin:12px 0;flex-wrap:wrap}.row.between{justify-content:space-between}.row.center{justify-content:center}.row.wrap{flex-wrap:wrap}
+.row input:not([type=checkbox]){flex:1;min-width:120px}
+.hint{color:#8fa1ba;font-size:13.5px}.warn{color:#ffd166}.dim{color:#7d8ca3}.bad{color:#ff6b7a}.ok{color:#5df2a0}.info{color:#9fb0c8}
+.chk{display:inline-flex;gap:8px;align-items:center}
+.card{background:#111926;border:1px solid #233149;border-radius:14px;padding:14px;margin:12px 0}
+/* modal */
+.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(3px)}
+.modal{background:#0b111b;border:1px solid #233149;border-radius:20px;width:min(760px,94vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.modal.wide{width:min(1100px,96vw)}
+.modal header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #1d2a40}
+.modal header h2{flex:1;margin:0;font-size:20px}
+.modal header button{width:44px;height:44px;border-radius:12px;border:1px solid #2d3b54;background:#141d2c;color:#fff;font-size:22px;cursor:pointer}
+.modal .body{padding:6px 18px 18px;overflow:auto;-webkit-overflow-scrolling:touch}
+.modal h3{margin:18px 0 6px;font-size:15px;color:#9fb0c8;text-transform:uppercase;letter-spacing:.06em}
+.lead{font-size:19px}.feat li{margin:6px 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:12px}
+.tile{background:#121b2a;border:1px solid #233149;border-radius:16px;padding:16px 12px;color:#e8eef6;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;font:inherit;min-height:112px}
+.tile:active{background:#1a2740}.tile .ic{font-size:28px}.tile b{font-size:16px}.tile small{color:#8fa1ba}
+.foot{color:#6f7f97;font-size:13px;margin-top:16px}
+.skins{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:12px}
+.skin{background:#121b2a;border:2px solid #233149;border-radius:14px;overflow:hidden;cursor:pointer}
+.skin.cur{border-color:#3b7bff}
+.skin canvas{width:100%;display:block;aspect-ratio:16/9;background:#000}
+.skin .meta{padding:8px 10px 0;display:flex;flex-direction:column}.skin .meta small{color:#8fa1ba}
+.skin .acts{display:flex;gap:6px;padding:8px 10px 10px}
+.srcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px}
+.src{background:#121b2a;border:2px solid #233149;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:4px;cursor:pointer}
+.src.on{border-color:#3b7bff}.src input{display:none}.src .ic{font-size:26px}.src small{color:#8fa1ba}
+pre{white-space:pre-wrap;font-size:12px;max-height:200px;overflow:auto;background:#060a10;padding:8px;border-radius:8px}
+.trips{display:flex;flex-direction:column;gap:8px}
+.trip{background:#121b2a;border:1px solid #233149;border-radius:12px;padding:12px;cursor:pointer}
+.trip .stats{display:flex;gap:14px;flex-wrap:wrap;color:#b6c4d8;font-size:14px;margin-top:4px}
+.rec{color:#ff5c6c}
+.route{width:100%;border-radius:12px;display:block;margin:8px 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.kpis div{background:#121b2a;border-radius:10px;padding:8px 10px;display:flex;flex-direction:column}.kpis small{color:#8fa1ba}.kpis b{font-size:19px}
+.perfbig{text-align:center;padding:16px}#pf-state{font-size:22px;color:#ffd166}#pf-time{font-size:72px;font-weight:800;font-variant-numeric:tabular-nums}#pf-spd{color:#9fb0c8;font-size:18px}
+table.res{width:100%;border-collapse:collapse;margin-top:8px}table.res td{padding:8px 10px;border-bottom:1px solid #1d2a40}table.res td:last-child{text-align:right;font-weight:700}
+table.chk td:last-child{text-align:left}
+.rep{font:12px monospace;margin-top:8px}
+.dtc{padding:6px 0;border-bottom:1px solid #1d2a40}.dtc b{color:#ffd166;margin-right:8px}.dtc a{color:#6ea8ff}
+.alert{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #1d2a40}.alert input[type=text]{flex:1;min-width:140px}
+.form label{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #141e2e}
+.form label input[type=text]{max-width:55%}.form label input[type=number]{width:120px}.form label input[type=range]{width:200px}
+/* media dock */
+#dock{width:0;overflow:hidden;background:#090e16;border-left:1px solid #1d2a40;transition:width .25s;display:flex;flex-direction:column}
+.dock-on #dock{width:min(40vw,520px);min-width:min(340px,50vw);overflow-y:auto;padding:0 12px 12px}
+.dock-h{display:flex;justify-content:space-between;align-items:center;padding:10px 0}
+.dock-h .x{width:42px;height:42px;border-radius:10px;border:1px solid #2d3b54;background:#141d2c;color:#fff;font-size:18px}
+.yt{position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:16/9;flex-shrink:0}
+.ytwrap,.ytwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.ytph{display:flex;align-items:center;justify-content:center;height:100%;color:#6f7f97;padding:20px;text-align:center}
+.parked{position:absolute;inset:0;background:#05080d;display:none;align-items:center;justify-content:center;text-align:center;padding:20px;font-weight:700;color:#ffd166}
+.parked.show{display:flex}
+.favs{display:flex;flex-wrap:wrap;gap:6px}
+.fav{background:#141d2c;border:1px solid #2d3b54;border-radius:99px;padding:6px 12px;font-size:13px;cursor:pointer}.fav i{font-style:normal;margin-left:8px;color:#ff8a98}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:10px;margin:14px 0}
+.app{background:none;border:0;color:#cfd9e8;display:flex;flex-direction:column;align-items:center;gap:6px;font:12.5px system-ui;cursor:pointer;padding:6px}
+.app span{width:58px;height:58px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;font-weight:800}
+.app:active span{transform:scale(.92)}
+/* editor */
+#edpanel{width:0;overflow:hidden;background:#0b111b;border-left:1px solid #1d2a40}
+.editing #edpanel{width:320px;overflow-y:auto;padding:12px}
+#edpanel h3{margin:6px 0 10px}
+#edpanel label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:#9fb0c8;margin-bottom:8px}
+#edpanel label.chk{flex-direction:row;align-items:center}
+#edpanel label.cf{flex-direction:row;justify-content:space-between;align-items:center}
+#edpanel label.cf span{display:flex;gap:6px}#edpanel label.cf select{width:100px}
+#edpanel .pos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}#edpanel .pos input{width:100%;padding:6px}
+.edhint{color:#9fb0c8;font-size:14px}
+#edbar{position:absolute;top:8px;left:8px;right:8px;display:none;gap:6px;flex-wrap:wrap;background:rgba(10,15,24,.92);padding:8px;border-radius:14px;border:1px solid #2d3b54}
+.editing #edbar{display:flex}.editing #hud,.editing #dots{display:none}
+#edbar select{min-height:34px;padding:4px 8px}
+.swatches{display:flex;flex-wrap:wrap;gap:6px}.sw{width:36px;height:36px;border-radius:10px;border:2px solid #2d3b54;cursor:pointer}
+@media (max-width:700px){.editing #edpanel{width:240px}.hud-r button{width:44px;height:44px}}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="night"></div>
+    <div id="alertbar"></div>
+    <div id="scrname"></div>
+    <div id="hud">
+      <div class="hud-l"><span id="srcpill" class="pill">Demo</span><span id="trippill" class="pill rec" style="display:none"></span><span id="perfpill" class="pill warn" style="display:none"></span><span id="fps"></span></div>
+      <div class="hud-r"><button id="btn-trip" title="Trips">🗺</button><button id="btn-media" title="Media & apps">▶</button><button id="btn-full" title="Fullscreen">⛶</button><button id="btn-menu" title="Menu">☰</button></div>
+    </div>
+    <div id="dots"></div>
+    <div id="edbar"></div>
+  </div>
+  <div id="edpanel"></div>
+  <div id="dock"></div>
+</div>
+<div id="toast"></div>
+<script>
+/* ===== CORE: namespace, channels, units, storage ===== */
+'use strict';
+const RD = window.RD = {};
+RD.W = 1280; RD.H = 720;
+RD.VERSION = '1.0.0';
+
+RD.store = {
+  get(k, d) { try { const v = localStorage.getItem('rdx.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('rdx.' + k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+};
+
+RD.defaults = {
+  units: 'metric', pressure: 'bar', ratios: '7.5,13,19,26,33,40', redline: 6500,
+  night: false, brightness: 1, wake: true, fps: false, maxFps: 60, quality: 'auto',
+  source: 'sim', skin: 'neon', screen: 0, tank: 45, fuelPrice: 105, volume: 0.6,
+  voice: true, obdFast: '0C,0D,11', obdSlow: '05,0F,04,0B,10,42,2F,0E,5C,46'
+};
+RD.settings = Object.assign({}, RD.defaults, RD.store.get('settings', {}));
+RD.saveSettings = () => RD.store.set('settings', RD.settings);
+
+/* Channels — canonical units: speed km/h, temp °C, boost bar, dist km, eco km/L */
+RD.CH = {
+  rpm:      { label: 'RPM', kind: '', unit: 'rpm', min: 0, max: 8000, dec: 0 },
+  speed:    { label: 'Speed', kind: 'speed', min: 0, max: 240, dec: 0 },
+  gear:     { label: 'Gear', kind: '', unit: '', min: -1, max: 6, dec: 0 },
+  throttle: { label: 'Throttle', kind: '', unit: '%', min: 0, max: 100, dec: 0 },
+  load:     { label: 'Engine Load', kind: '', unit: '%', min: 0, max: 100, dec: 0 },
+  coolant:  { label: 'Coolant', kind: 'temp', min: 40, max: 130, dec: 0 },
+  intake:   { label: 'Intake Air', kind: 'temp', min: -10, max: 80, dec: 0 },
+  oiltemp:  { label: 'Oil Temp', kind: 'temp', min: 40, max: 150, dec: 0 },
+  maf:      { label: 'MAF', kind: '', unit: 'g/s', min: 0, max: 200, dec: 1 },
+  map:      { label: 'MAP', kind: '', unit: 'kPa', min: 0, max: 250, dec: 0 },
+  boost:    { label: 'Boost', kind: 'pressure', min: -1, max: 1.5, dec: 2 },
+  fuel:     { label: 'Fuel Level', kind: '', unit: '%', min: 0, max: 100, dec: 0 },
+  volt:     { label: 'Battery', kind: '', unit: 'V', min: 10, max: 16, dec: 1 },
+  timing:   { label: 'Timing Adv', kind: '', unit: '°', min: -10, max: 50, dec: 1 },
+  afr:      { label: 'AFR', kind: '', unit: ':1', min: 10, max: 20, dec: 1 },
+  ambient:  { label: 'Ambient', kind: 'temp', min: -10, max: 50, dec: 0 },
+  fuelRate: { label: 'Fuel Rate', kind: '', unit: 'L/h', min: 0, max: 30, dec: 1 },
+  eco:      { label: 'Instant Eco', kind: 'eco', min: 0, max: 40, dec: 1 },
+  avgEco:   { label: 'Avg Eco', kind: 'eco', min: 0, max: 40, dec: 1 },
+  accelX:   { label: 'Lateral G', kind: '', unit: 'g', min: -1.5, max: 1.5, dec: 2 },
+  accelY:   { label: 'Long. G', kind: '', unit: 'g', min: -1.5, max: 1.5, dec: 2 },
+  heading:  { label: 'Heading', kind: '', unit: '°', min: 0, max: 360, dec: 0 },
+  altitude: { label: 'Altitude', kind: 'alt', min: 0, max: 3000, dec: 0 },
+  gpsAcc:   { label: 'GPS Accuracy', kind: 'alt', min: 0, max: 50, dec: 0 },
+  tripDist: { label: 'Trip', kind: 'dist', min: 0, max: 1000, dec: 1 },
+  tripTime: { label: 'Trip Time', kind: 'time', min: 0, max: 36000, dec: 0 },
+  avgSpeed: { label: 'Avg Speed', kind: 'speed', min: 0, max: 200, dec: 0 },
+  maxSpeed: { label: 'Max Speed', kind: 'speed', min: 0, max: 300, dec: 0 },
+  range:    { label: 'Range', kind: 'dist', min: 0, max: 900, dec: 0 },
+  tripFuel: { label: 'Trip Fuel', kind: '', unit: 'L', min: 0, max: 100, dec: 2 },
+  tripCost: { label: 'Trip Cost', kind: '', unit: '₹', min: 0, max: 10000, dec: 0 },
+  hp:       { label: 'Est. Power', kind: '', unit: 'hp', min: 0, max: 300, dec: 0 },
+  dtcCount: { label: 'Fault Codes', kind: '', unit: '', min: 0, max: 20, dec: 0 }
+};
+RD.chList = () => Object.keys(RD.CH);
+
+RD.data = {};           // live raw values (canonical units)
+RD.chList().forEach(k => RD.data[k] = 0);
+RD.data.coolant = 25; RD.data.intake = 25; RD.data.oiltemp = 25; RD.data.volt = 12.4; RD.data.fuel = 70; RD.data.afr = 14.7;
+RD.data.ambient = 28;
+
+RD.imp = () => RD.settings.units === 'imperial';
+RD.unitFor = (ch) => {
+  const c = RD.CH[ch]; if (!c) return '';
+  switch (c.kind) {
+    case 'speed': return RD.imp() ? 'mph' : 'km/h';
+    case 'temp': return RD.imp() ? '°F' : '°C';
+    case 'pressure': return RD.settings.pressure;
+    case 'dist': return RD.imp() ? 'mi' : 'km';
+    case 'alt': return RD.imp() ? 'ft' : 'm';
+    case 'eco': return RD.imp() ? 'mpg' : 'km/L';
+    case 'time': return '';
+    default: return c.unit || '';
+  }
+};
+RD.toDisp = (ch, v) => {
+  const c = RD.CH[ch]; if (!c || v == null || isNaN(v)) return v;
+  const imp = RD.imp();
+  switch (c.kind) {
+    case 'speed': case 'dist': return imp ? v * 0.621371 : v;
+    case 'temp': return imp ? v * 9 / 5 + 32 : v;
+    case 'pressure': return RD.settings.pressure === 'psi' ? v * 14.5038 : RD.settings.pressure === 'kPa' ? v * 100 : v;
+    case 'alt': return imp ? v * 3.28084 : v;
+    case 'eco': return imp ? v * 2.35215 : v;
+    default: return v;
+  }
+};
+RD.fmtTime = (s) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = s % 60; return (h ? h + ':' : '') + String(m).padStart(h ? 2 : 1, '0') + ':' + String(ss).padStart(2, '0'); };
+RD.fmt = (ch, v, dec) => {
+  const c = RD.CH[ch];
+  if (c && c.kind === 'time') return RD.fmtTime(v);
+  if (ch === 'gear') return RD.gearText(v);
+  const d = RD.toDisp(ch, v);
+  if (d == null || isNaN(d)) return '--';
+  const dd = dec != null ? dec : (c ? c.dec : 0);
+  return Number(d).toFixed(dd);
+};
+RD.gearText = (g) => g === -1 ? 'R' : (!g ? 'N' : String(Math.round(g)));
+RD.clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+RD.lerp = (a, b, t) => a + (b - a) * t;
+RD.uid = () => Math.random().toString(36).slice(2, 9);
+RD.clone = (o) => JSON.parse(JSON.stringify(o));
+RD.niceStep = (range, target) => {
+  const raw = range / (target || 8), p = Math.pow(10, Math.floor(Math.log10(raw))), n = raw / p;
+  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * p;
+};
+
+/* Simple event bus */
+RD.bus = { h: {}, on(e, f) { (this.h[e] = this.h[e] || []).push(f); }, emit(e, a) { (this.h[e] || []).forEach(f => { try { f(a); } catch (er) { console.error(er); } }); } };
+
+/* Toast */
+RD.toast = (msg, ms) => {
+  const t = document.getElementById('toast'); if (!t) return;
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(RD._tt); RD._tt = setTimeout(() => t.classList.remove('show'), ms || 2600);
+};
+
+/* ===== WIDGET RENDER ENGINE ===== */
+'use strict';
+RD.FONTS = {
+  sans: 'system-ui, Roboto, "Segoe UI", Helvetica, Arial, sans-serif',
+  cond: '"Roboto Condensed", "sans-serif-condensed", "Arial Narrow", "Helvetica Neue", sans-serif',
+  wide: '"Eurostile", "Microgramma", "Bank Gothic", "Arial Black", Impact, sans-serif',
+  mono: '"Roboto Mono", "DejaVu Sans Mono", "Courier New", monospace',
+  serif: 'Georgia, "Times New Roman", serif',
+  seg7: 'seg7'
+};
+RD.col = (c, skin) => {
+  if (!c) return 'transparent';
+  if (c[0] === '@') { const p = (skin && skin.pal) || {}; return p[c.slice(1)] || '#fff'; }
+  return c;
+};
+RD.fontOf = (f, skin) => (!f || f === '@') ? ((skin && skin.font) || 'sans') : f;
+RD.hq = true;
+
+/* ---------- 7-segment renderer (no font files needed) ---------- */
+const SEG = {
+  '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc', '5': 'afgcd', '6': 'afgedc', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg',
+  '-': 'g', ' ': '', 'N': 'abcef', 'n': 'ceg', 'R': 'eg', 'r': 'eg', 'P': 'abefg', 'E': 'adefg', 'F': 'aefg', 'A': 'abcefg', 'b': 'cdefg',
+  'C': 'adef', 'c': 'deg', 'd': 'bcdeg', 'H': 'bcefg', 'h': 'cefg', 'L': 'def', 'o': 'cdeg', 'O': 'abcdef', 'S': 'afgcd', 't': 'defg', 'U': 'bcdef', 'u': 'cde', 'y': 'bcdfg', '_': 'd', '°': 'abfg'
+};
+RD.seg7Width = (str, h) => { let w = 0; for (const ch of String(str)) w += (ch === '.' || ch === ':') ? h * 0.22 : h * 0.62; return w; };
+RD.seg7 = (ctx, str, x, y, h, color, align, ghost) => {
+  str = String(str); const cw = h * 0.5, t = Math.max(1, h * 0.1), g = t * 0.25;
+  const total = RD.seg7Width(str, h);
+  let px = align === 'center' ? x - total / 2 : align === 'right' ? x - total : x;
+  const top = y - h / 2;
+  ctx.save(); ctx.translate(px, top); ctx.transform(1, 0, -0.08, 1, h * 0.04, 0);
+  let ox = 0;
+  const segRect = (s, ox) => {
+    const hh = h / 2;
+    switch (s) {
+      case 'a': return [ox + t / 2 + g, 0, cw - t - 2 * g, t];
+      case 'd': return [ox + t / 2 + g, h - t, cw - t - 2 * g, t];
+      case 'g': return [ox + t / 2 + g, hh - t / 2, cw - t - 2 * g, t];
+      case 'f': return [ox, t / 2 + g, t, hh - t / 2 - 2 * g];
+      case 'b': return [ox + cw - t, t / 2 + g, t, hh - t / 2 - 2 * g];
+      case 'e': return [ox, hh + g, t, hh - t / 2 - 2 * g];
+      case 'c': return [ox + cw - t, hh + g, t, hh - t / 2 - 2 * g];
+    }
+  };
+  for (const ch of str) {
+    if (ch === '.' || ch === ':') {
+      ctx.fillStyle = color;
+      if (ch === '.') ctx.fillRect(ox, h - t, t, t);
+      else { ctx.fillRect(ox, h * 0.28, t, t); ctx.fillRect(ox, h * 0.66, t, t); }
+      ox += h * 0.22; continue;
+    }
+    const on = SEG[ch] != null ? SEG[ch] : SEG[ch.toUpperCase()] || '';
+    for (const s of 'abcdefg') {
+      const lit = on.indexOf(s) >= 0;
+      if (!lit && !ghost) continue;
+      ctx.fillStyle = lit ? color : ghost;
+      const r = segRect(s, ox); ctx.fillRect(r[0], r[1], r[2], r[3]);
+    }
+    ox += h * 0.62;
+  }
+  ctx.restore();
+};
+
+/* ---------- text helper ---------- */
+RD.text = (ctx, str, x, y, px, o) => {
+  o = o || {}; const f = o.font || 'sans';
+  if (f === 'seg7') { RD.seg7(ctx, str, x, y, px * 0.78, o.color || '#fff', o.align || 'left', o.ghost); return; }
+  ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 600) + ' ' + Math.max(1, px).toFixed(1) + 'px ' + (RD.FONTS[f] || RD.FONTS.sans);
+  ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'middle';
+  ctx.fillStyle = o.color || '#fff';
+  if (o.glow && RD.hq) { ctx.shadowColor = o.glow; ctx.shadowBlur = px * 0.35; }
+  ctx.fillText(str, x, y);
+  if (o.glow) ctx.shadowBlur = 0;
+};
+RD.measure = (ctx, str, px, f, weight) => {
+  if (f === 'seg7') return RD.seg7Width(str, px * 0.78);
+  ctx.font = (weight || 600) + ' ' + px + 'px ' + (RD.FONTS[f] || RD.FONTS.sans); return ctx.measureText(str).width;
+};
+RD.rr = (ctx, x, y, w, h, r) => {
+  r = Math.max(0, Math.min(r || 0, w / 2, h / 2)); ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+};
+const D2R = Math.PI / 180;
+
+/* range helper in display units */
+RD.range = (w) => {
+  const ch = w.src; let lo = RD.toDisp(ch, w.min), hi = RD.toDisp(ch, w.max);
+  const c = RD.CH[ch];
+  if (c && (c.kind === 'speed' || c.kind === 'temp') && RD.imp()) hi = Math.ceil(hi / 10) * 10;
+  return [lo, hi];
+};
+RD.frac = (w, v) => { const [lo, hi] = RD.range(w); return RD.clamp((RD.toDisp(w.src, v) - lo) / ((hi - lo) || 1), 0, 1); };
+RD.segColor = (f, w, skin) => f >= (w.t2 != null ? w.t2 : 0.85) ? RD.col(w.c3 || '@warn', skin) : f >= (w.t1 != null ? w.t1 : 0.6) ? RD.col(w.c2 || '@accent', skin) : RD.col(w.c1 || '@primary', skin);
+
+/* ---------- face cache (static layers drawn once) ---------- */
+RD.faceCache = new Map();
+RD.cached = (ctx, w, skin, key, drawFn) => {
+  if (RD.noCache) { ctx.save(); ctx.translate(w.x, w.y); drawFn(ctx); ctx.restore(); return; }
+  const S = RD.scale * (RD.dpr || 1);
+  const k = w.id + '|' + key + '|' + S.toFixed(3) + '|' + RD.settings.units + RD.settings.pressure + '|' + skin.id + '|' + w._v + '|' + w.w + 'x' + w.h + (RD.settings.night ? 'n' : '');
+  let e = RD.faceCache.get(w.id);
+  if (!e || e.k !== k) {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.ceil(w.w * S)); c.height = Math.max(1, Math.ceil(w.h * S));
+    const cx = c.getContext('2d'); cx.scale(S, S); drawFn(cx);
+    e = { k, c }; RD.faceCache.set(w.id, e);
+  }
+  ctx.drawImage(e.c, w.x, w.y, w.w, w.h);
+};
+
+/* ========== WIDGET TYPES ========== */
+const P = (k, label, type, opts, extra) => Object.assign({ k, label, type, opts }, extra || {});
+const COMMON_SRC = [P('src', 'Data', 'ch'), P('min', 'Min', 'num'), P('max', 'Max', 'num')];
+const COLORS = (...ks) => ks.map(k => P(k[0], k[1], 'color'));
+RD.WT = {};
+
+/* ----- Radial gauge ----- */
+RD.WT.radial = {
+  name: 'Radial Gauge',
+  def: { w: 320, h: 320, src: 'rpm', min: 0, max: 8000, red: 6500, mode: 'needle', start: 135, sweep: 270, numDiv: 1000, minor: 4,
+    label: 'RPM', sub: 'x1000', showValue: true, valuePos: 'bottom', valueSize: 0.28, font: '@', face: '@face', ring: '@ring', ringW: 0.04,
+    tick: '@text', num: '@text', needle: '@warn', arc: '@primary', track: '@track', redC: '@warn', arcW: 0.1, glow: true, smooth: 10 },
+  props: [...COMMON_SRC, P('red', 'Redline from', 'num'), P('mode', 'Style', 'sel', ['needle', 'arc', 'both', 'arcOnly']), P('start', 'Start angle', 'num'), P('sweep', 'Sweep', 'num'),
+    P('numDiv', 'Number divider', 'num'), P('minor', 'Minor ticks', 'num'), P('label', 'Label', 'text'), P('sub', 'Sub label', 'text'), P('showValue', 'Show value', 'bool'),
+    P('valuePos', 'Value position', 'sel', ['center', 'bottom']), P('valueSize', 'Value size', 'num'), P('font', 'Font', 'font'), P('ringW', 'Ring width', 'num'), P('arcW', 'Arc width', 'num'),
+    ...COLORS(['face', 'Face'], ['ring', 'Ring'], ['tick', 'Ticks'], ['num', 'Numbers'], ['needle', 'Needle'], ['arc', 'Arc'], ['track', 'Track'], ['redC', 'Red zone']), P('glow', 'Glow', 'bool'), P('smooth', 'Smoothing', 'num')],
+  draw(ctx, w, v, skin) {
+    const r = Math.min(w.w, w.h) / 2 * 0.97, a0 = w.start * D2R, sw = w.sweep * D2R;
+    const [lo, hi] = RD.range(w), f = RD.frac(w, v), font = RD.fontOf(w.font, skin);
+    const redF = w.red != null && w.red !== '' ? RD.frac(w, w.red) : 2;
+    RD.cached(ctx, w, skin, 'face', (c) => {
+      const cx = w.w / 2, cy = w.h / 2;
+      const fc = RD.col(w.face, skin);
+      if (w.face && fc !== 'none' && fc !== 'transparent') {
+        const g = c.createRadialGradient(cx, cy - r * 0.3, r * 0.1, cx, cy, r);
+        g.addColorStop(0, fc); g.addColorStop(1, RD.shade(fc, -0.35));
+        c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+      }
+      const rc = RD.col(w.ring, skin);
+      if (w.ringW > 0 && rc !== 'none' && rc !== 'transparent') {
+        const g = c.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+        g.addColorStop(0, RD.shade(rc, 0.4)); g.addColorStop(0.5, RD.shade(rc, -0.3)); g.addColorStop(1, RD.shade(rc, 0.2));
+        c.strokeStyle = g; c.lineWidth = r * w.ringW; c.beginPath(); c.arc(cx, cy, r - r * w.ringW / 2, 0, Math.PI * 2); c.stroke();
+      }
+      const ar = r * 0.84;
+      if (w.mode !== 'needle') {
+        c.strokeStyle = RD.col(w.track, skin); c.lineWidth = r * w.arcW; c.lineCap = 'butt';
+        c.beginPath(); c.arc(cx, cy, ar, a0, a0 + sw); c.stroke();
+      }
+      if (redF <= 1) {
+        c.strokeStyle = RD.col(w.redC, skin); c.lineWidth = r * 0.035;
+        c.beginPath(); c.arc(cx, cy, r * 0.905, a0 + sw * redF, a0 + sw); c.stroke();
+      }
+      if (w.mode !== 'arcOnly') {
+        const span = hi - lo, step = RD.niceStep(span, w.numDiv >= 1000 ? span / w.numDiv : 9), minor = Math.max(0, w.minor | 0);
+        c.strokeStyle = RD.col(w.tick, skin);
+        const first = Math.ceil(lo / step) * step, nLab = Math.floor((hi - first) / step) + 1, nf = Math.min(0.13, 1.45 / Math.max(1, nLab));
+        for (let val = first; val <= hi + 1e-9; val += step) {
+          const fr = (val - lo) / span, a = a0 + sw * fr, ca = Math.cos(a), sa = Math.sin(a);
+          c.lineWidth = r * 0.025; c.beginPath(); c.moveTo(cx + ca * r * 0.93, cy + sa * r * 0.93); c.lineTo(cx + ca * r * 0.79, cy + sa * r * 0.79); c.stroke();
+          const nd = w.numDiv || 1, lab = +(val / nd).toFixed(2);
+          RD.text(c, String(lab), cx + ca * r * 0.64, cy + sa * r * 0.64, r * nf, { font, color: RD.col(w.num, skin), align: 'center', weight: 700 });
+          if (minor) for (let m = 1; m <= minor; m++) {
+            const fv = val + step * m / (minor + 1); if (fv > hi) break;
+            const am = a0 + sw * (fv - lo) / span, cm = Math.cos(am), sm = Math.sin(am);
+            c.lineWidth = r * 0.012; c.beginPath(); c.moveTo(cx + cm * r * 0.93, cy + sm * r * 0.93); c.lineTo(cx + cm * r * 0.86, cy + sm * r * 0.86); c.stroke();
+          }
+        }
+      }
+      const ly = w.valuePos === 'center' && w.showValue ? cy + r * 0.38 : cy - r * 0.32;
+      if (w.label) RD.text(c, w.label.replace('{unit}', RD.unitFor(w.src)), cx, ly, r * 0.1, { font: font === 'seg7' ? 'sans' : font, color: RD.col(w.num, skin), align: 'center', weight: 700 });
+      if (w.sub) RD.text(c, w.sub, cx, ly + r * 0.12, r * 0.07, { color: RD.col('@dim', skin), align: 'center' });
+    });
+    const cx = w.x + w.w / 2, cy = w.y + w.h / 2, ar = r * 0.84;
+    const hot = f >= redF;
+    if (w.mode !== 'needle' && f > 0.001) {
+      ctx.strokeStyle = hot ? RD.col(w.redC, skin) : RD.col(w.arc, skin); ctx.lineWidth = r * w.arcW; ctx.lineCap = 'butt';
+      if (w.glow && RD.hq) { ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = r * 0.12; }
+      ctx.beginPath(); ctx.arc(cx, cy, ar, a0, a0 + sw * f); ctx.stroke(); ctx.shadowBlur = 0;
+    }
+    if (w.mode === 'needle' || w.mode === 'both') {
+      const a = a0 + sw * f, ca = Math.cos(a), sa = Math.sin(a), nx = -sa, ny = ca, nw = r * 0.028;
+      ctx.fillStyle = RD.col(w.needle, skin);
+      if (w.glow && RD.hq) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = r * 0.08; }
+      ctx.beginPath(); ctx.moveTo(cx - ca * r * 0.16 + nx * nw, cy - sa * r * 0.16 + ny * nw); ctx.lineTo(cx + ca * r * 0.9, cy + sa * r * 0.9);
+      ctx.lineTo(cx - ca * r * 0.16 - nx * nw, cy - sa * r * 0.16 - ny * nw); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = RD.col('@ring', skin); ctx.beginPath(); ctx.arc(cx, cy, r * 0.075, 0, 7); ctx.fill();
+      ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, cy, r * 0.04, 0, 7); ctx.fill();
+    }
+    if (w.showValue) {
+      const vy = w.valuePos === 'center' ? cy : cy + r * 0.52, font2 = RD.fontOf(w.font, skin);
+      const s = RD.fmt(w.src, v, w.dec);
+      RD.text(ctx, s, cx, vy, r * w.valueSize, { font: font2, color: hot ? RD.col(w.redC, skin) : RD.col('@text', skin), align: 'center', weight: 800, ghost: font2 === 'seg7' ? RD.col('@ghost', skin) : null });
+      if (w.valuePos === 'center') RD.text(ctx, RD.unitFor(w.src), cx, vy + r * w.valueSize * 0.72, r * 0.09, { color: RD.col('@dim', skin), align: 'center' });
+    }
+  }
+};
+
+/* ----- Bar gauge ----- */
+RD.WT.bar = {
+  name: 'Bar Gauge',
+  def: { w: 400, h: 50, src: 'coolant', min: 40, max: 130, orient: 'h', segs: 20, gap: 0.25, radius: 4, t1: 0.6, t2: 0.85,
+    c1: '@primary', c2: '@accent', c3: '@warn', track: '@track', label: 'TEMP', showValue: true, font: '@', smooth: 8 },
+  props: [...COMMON_SRC, P('orient', 'Orientation', 'sel', ['h', 'v']), P('segs', 'Segments (0=solid)', 'num'), P('gap', 'Segment gap', 'num'), P('radius', 'Corner radius', 'num'),
+    P('t1', 'Color 2 from (0-1)', 'num'), P('t2', 'Color 3 from (0-1)', 'num'), ...COLORS(['c1', 'Color 1'], ['c2', 'Color 2'], ['c3', 'Color 3'], ['track', 'Track']),
+    P('label', 'Label', 'text'), P('showValue', 'Show value', 'bool'), P('font', 'Font', 'font'), P('smooth', 'Smoothing', 'num')],
+  draw(ctx, w, v, skin) {
+    const f = RD.frac(w, v), font = RD.fontOf(w.font, skin), vert = w.orient === 'v';
+    let bx = w.x, by = w.y, bw = w.w, bh = w.h;
+    const hasText = w.label || w.showValue;
+    if (hasText) { if (vert) { bh -= 34; by += 0; } else { by += bh * 0.42; bh *= 0.58; } }
+    if (hasText) {
+      if (vert) {
+        if (w.label) RD.text(ctx, w.label, w.x + w.w / 2, w.y + w.h - 22, 13, { color: RD.col('@dim', skin), align: 'center', weight: 700 });
+        if (w.showValue) RD.text(ctx, RD.fmt(w.src, v, w.dec), w.x + w.w / 2, w.y + w.h - 6, 14, { color: RD.col('@text', skin), align: 'center', weight: 800, font: font === 'seg7' ? 'sans' : font });
+      } else {
+        const th = w.h * 0.36;
+        if (w.label) RD.text(ctx, w.label, w.x, w.y + th / 2, th * 0.8, { color: RD.col('@dim', skin), weight: 700 });
+        if (w.showValue) RD.text(ctx, RD.fmt(w.src, v, w.dec) + ' ' + RD.unitFor(w.src), w.x + w.w, w.y + th / 2, th * 0.9, { color: RD.col('@text', skin), align: 'right', weight: 800, font: font === 'seg7' ? 'sans' : font });
+      }
+    }
+    const n = w.segs | 0;
+    if (n > 0) {
+      const len = vert ? bh : bw, cell = len / n, g = cell * w.gap;
+      for (let i = 0; i < n; i++) {
+        const p = (i + 0.5) / n, lit = p <= f + 0.5 / n * 0.999 && f > 0;
+        ctx.fillStyle = lit ? RD.segColor(i / n, w, skin) : RD.col(w.track, skin);
+        if (vert) RD.rr(ctx, bx, by + bh - (i + 1) * cell + g / 2, bw, cell - g, w.radius);
+        else RD.rr(ctx, bx + i * cell + g / 2, by, cell - g, bh, w.radius);
+        ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = RD.col(w.track, skin); RD.rr(ctx, bx, by, bw, bh, w.radius); ctx.fill();
+      if (f > 0) {
+        const g = vert ? ctx.createLinearGradient(0, by + bh, 0, by) : ctx.createLinearGradient(bx, 0, bx + bw, 0);
+        g.addColorStop(0, RD.col(w.c1, skin)); g.addColorStop(RD.clamp(w.t1, 0, 1), RD.col(w.c2, skin)); g.addColorStop(1, RD.col(w.c3, skin));
+        ctx.fillStyle = g;
+        if (vert) RD.rr(ctx, bx, by + bh * (1 - f), bw, bh * f, w.radius); else RD.rr(ctx, bx, by, bw * f, bh, w.radius);
+        ctx.fill();
+      }
+    }
+  }
+};
+
+/* ----- Digital readout ----- */
+RD.WT.digital = {
+  name: 'Digital Readout',
+  def: { w: 220, h: 110, src: 'speed', min: 0, max: 240, dec: '', label: '', showUnit: true, align: 'center', font: '@', color: '@text', labelC: '@dim',
+    panel: 'none', border: 'none', radius: 10, warnHi: '', warnLo: '', warnC: '@warn', size: 1, smooth: 0 },
+  props: [P('src', 'Data', 'ch'), P('dec', 'Decimals (blank=auto)', 'num'), P('label', 'Label (blank=auto)', 'text'), P('showUnit', 'Show unit', 'bool'), P('align', 'Align', 'sel', ['left', 'center', 'right']),
+    P('font', 'Font', 'font'), P('size', 'Text scale', 'num'), ...COLORS(['color', 'Value color'], ['labelC', 'Label color'], ['panel', 'Panel fill'], ['border', 'Border'], ['warnC', 'Warning color']),
+    P('radius', 'Corner radius', 'num'), P('warnHi', 'Warn above', 'num'), P('warnLo', 'Warn below', 'num'), P('smooth', 'Smoothing', 'num')],
+  draw(ctx, w, v, skin) {
+    const font = RD.fontOf(w.font, skin);
+    if (w.panel && w.panel !== 'none') { ctx.fillStyle = RD.col(w.panel, skin); RD.rr(ctx, w.x, w.y, w.w, w.h, w.radius); ctx.fill(); }
+    if (w.border && w.border !== 'none') { ctx.strokeStyle = RD.col(w.border, skin); ctx.lineWidth = 2; RD.rr(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, w.radius); ctx.stroke(); }
+    const label = w.label === '' || w.label == null ? (RD.CH[w.src] || {}).label || '' : w.label;
+    const hasL = label && label !== '-';
+    const pad = w.h * 0.08, lh = hasL ? w.h * 0.2 : 0;
+    const ax = w.align === 'left' ? w.x + pad * 1.5 : w.align === 'right' ? w.x + w.w - pad * 1.5 : w.x + w.w / 2;
+    if (hasL) RD.text(ctx, label.toUpperCase(), ax, w.y + pad + lh / 2, lh * 0.8, { color: RD.col(w.labelC, skin), align: w.align, weight: 700, font: font === 'seg7' || font === 'wide' ? 'sans' : font });
+    const dv = RD.toDisp(w.src, v);
+    const warn = (w.warnHi !== '' && w.warnHi != null && dv > +w.warnHi) || (w.warnLo !== '' && w.warnLo != null && dv < +w.warnLo);
+    const s = RD.fmt(w.src, v, w.dec === '' ? null : w.dec), unit = w.showUnit ? RD.unitFor(w.src) : '';
+    let px = (w.h - lh - pad * 2) * 0.82 * (w.size || 1);
+    const uw = unit ? RD.measure(ctx, unit, px * 0.3, 'sans') + px * 0.12 : 0;
+    const maxW = w.w - pad * 3 - uw, mw = RD.measure(ctx, s, px, font, 800);
+    if (mw > maxW) px *= maxW / mw;
+    const vy = w.y + lh + pad + (w.h - lh - pad * 2) / 2 + (hasL ? pad * 0.3 : 0);
+    const col = warn && (Date.now() % 600 < 400) ? RD.col(w.warnC, skin) : RD.col(w.color, skin);
+    const vw = RD.measure(ctx, s, px, font, 800);
+    let vx = ax; if (w.align === 'center') vx = ax - uw / 2; if (w.align === 'right') vx = ax - uw;
+    RD.text(ctx, s, vx, vy, px, { font, color: col, align: w.align, weight: 800, glow: skin.glow ? col : null, ghost: font === 'seg7' ? RD.col('@ghost', skin) : null });
+    if (unit) {
+      const ux = w.align === 'center' ? vx + vw / 2 + px * 0.1 : w.align === 'right' ? vx + px * 0.1 : vx + vw + px * 0.1;
+      RD.text(ctx, unit, ux, vy + px * 0.22, px * 0.3, { color: RD.col(w.labelC, skin), weight: 600 });
+    }
+  }
+};
+
+/* ----- Gear indicator ----- */
+RD.WT.gear = {
+  name: 'Gear Indicator',
+  def: { w: 140, h: 160, src: 'gear', font: '@', color: '@text', panel: 'none', border: '@primary', radius: 16, shape: 'box', label: 'GEAR' },
+  props: [P('font', 'Font', 'font'), P('shape', 'Shape', 'sel', ['box', 'circle', 'none']), P('label', 'Label', 'text'), ...COLORS(['color', 'Text'], ['panel', 'Fill'], ['border', 'Border']), P('radius', 'Corner radius', 'num')],
+  draw(ctx, w, v, skin) {
+    const font = RD.fontOf(w.font, skin), cx = w.x + w.w / 2, cy = w.y + w.h / 2;
+    if (w.shape !== 'none') {
+      ctx.beginPath();
+      if (w.shape === 'circle') ctx.arc(cx, cy, Math.min(w.w, w.h) / 2 - 2, 0, 7); else RD.rr(ctx, w.x + 2, w.y + 2, w.w - 4, w.h - 4, w.radius);
+      if (w.panel !== 'none') { ctx.fillStyle = RD.col(w.panel, skin); ctx.fill(); }
+      if (w.border !== 'none') { ctx.strokeStyle = RD.col(w.border, skin); ctx.lineWidth = 3; ctx.stroke(); }
+    }
+    const g = RD.gearText(RD.data.gear), lh = w.label ? w.h * 0.14 : 0;
+    if (w.label) RD.text(ctx, w.label, cx, w.y + lh * 0.9, lh * 0.7, { color: RD.col('@dim', skin), align: 'center', weight: 700 });
+    const col = g === 'R' ? RD.col('@warn', skin) : RD.col(w.color, skin);
+    RD.text(ctx, g, cx, cy + lh * 0.35, (w.h - lh) * 0.78, { font, color: col, align: 'center', weight: 900, glow: skin.glow ? col : null, ghost: font === 'seg7' ? RD.col('@ghost', skin) : null });
+  }
+};
+
+/* ----- Shift lights ----- */
+RD.WT.shift = {
+  name: 'Shift Lights',
+  def: { w: 600, h: 40, src: 'rpm', n: 12, from: 4000, to: 6500, shape: 'circle', c1: '#22e05a', c2: '#ffd400', c3: '#ff2a2a', flash: '#3d7bff', off: '@track' },
+  props: [P('src', 'Data', 'ch'), P('n', 'LED count', 'num'), P('from', 'Start at', 'num'), P('to', 'Shift point', 'num'), P('shape', 'Shape', 'sel', ['circle', 'rect', 'bar']),
+    ...COLORS(['c1', 'Low'], ['c2', 'Mid'], ['c3', 'High'], ['flash', 'Shift flash'], ['off', 'Off'])],
+  draw(ctx, w, v, skin) {
+    const n = Math.max(1, w.n | 0), cell = w.w / n, f = RD.clamp((v - w.from) / ((w.to - w.from) || 1), 0, 1.0001);
+    const flashing = v >= w.to, blink = Date.now() % 160 < 80;
+    for (let i = 0; i < n; i++) {
+      const lit = flashing ? blink : (i + 1) / n <= f + 1e-6;
+      const p = i / n;
+      let c = p < 0.5 ? w.c1 : p < 0.8 ? w.c2 : w.c3; if (flashing) c = w.flash;
+      ctx.fillStyle = lit ? RD.col(c, skin) : RD.col(w.off, skin);
+      if (lit && RD.hq) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12; }
+      const cx = w.x + cell * (i + 0.5), cy = w.y + w.h / 2, s = Math.min(cell, w.h) * 0.8;
+      ctx.beginPath();
+      if (w.shape === 'circle') ctx.arc(cx, cy, s / 2, 0, 7);
+      else if (w.shape === 'bar') RD.rr(ctx, w.x + cell * i + cell * 0.08, w.y, cell * 0.84, w.h, 3);
+      else RD.rr(ctx, cx - s / 2, cy - s / 2, s, s, s * 0.15);
+      ctx.fill(); ctx.shadowBlur = 0;
+    }
+  }
+};
+
+/* ----- Warning lamp ----- */
+RD.WT.lamp = {
+  name: 'Warning Lamp',
+  def: { w: 110, h: 60, src: 'coolant', op: '>', val: 105, icon: '⚠', label: 'TEMP', on: '@warn', offC: '@track', blink: true, radius: 10 },
+  props: [P('src', 'Data', 'ch'), P('op', 'Condition', 'sel', ['>', '<']), P('val', 'Threshold', 'num'), P('icon', 'Icon/text', 'text'), P('label', 'Label', 'text'), ...COLORS(['on', 'On color'], ['offC', 'Off color']), P('blink', 'Blink', 'bool'), P('radius', 'Corner radius', 'num')],
+  draw(ctx, w, v, skin) {
+    const on = w.op === '<' ? v < w.val : v > w.val, show = on && (!w.blink || Date.now() % 700 < 450);
+    const c = show ? RD.col(w.on, skin) : RD.col(w.offC, skin);
+    ctx.strokeStyle = c; ctx.lineWidth = 2.5; RD.rr(ctx, w.x + 2, w.y + 2, w.w - 4, w.h - 4, w.radius); ctx.stroke();
+    if (show) { ctx.fillStyle = RD.shade(c, -0.6); ctx.fill(); }
+    const both = w.icon && w.label;
+    if (w.icon) RD.text(ctx, w.icon, w.x + (both ? w.w * 0.28 : w.w / 2), w.y + w.h / 2, w.h * 0.5, { color: c, align: 'center', weight: 800 });
+    if (w.label) RD.text(ctx, w.label, w.x + (both ? w.w * 0.64 : w.w / 2), w.y + w.h / 2, w.h * 0.28, { color: c, align: 'center', weight: 800 });
+  }
+};
+
+/* ----- History graph ----- */
+RD.hist = {};
+RD.WT.graph = {
+  name: 'History Graph',
+  def: { w: 400, h: 160, src: 'speed', min: 0, max: 200, secs: 60, line: '@primary', fill: true, grid: '@track', panel: 'none', label: '', radius: 10 },
+  props: [...COMMON_SRC, P('secs', 'Seconds shown', 'num'), P('label', 'Label (blank=auto)', 'text'), ...COLORS(['line', 'Line'], ['grid', 'Grid'], ['panel', 'Panel']), P('fill', 'Fill under line', 'bool'), P('radius', 'Corner radius', 'num')],
+  sample(w, v, now) {
+    const N = 120; let h = RD.hist[w.id];
+    if (!h || h.src !== w.src) h = RD.hist[w.id] = { a: new Float32Array(N).fill(NaN), i: 0, t: 0, src: w.src };
+    const iv = (w.secs || 60) * 1000 / N;
+    if (now - h.t >= iv) { h.a[h.i] = v; h.i = (h.i + 1) % N; h.t = now; }
+    return h;
+  },
+  draw(ctx, w, v, skin) {
+    const h = this.sample(w, v, Date.now()), N = h.a.length;
+    if (w.panel !== 'none') { ctx.fillStyle = RD.col(w.panel, skin); RD.rr(ctx, w.x, w.y, w.w, w.h, w.radius); ctx.fill(); }
+    const px = w.x + 8, py = w.y + 26, pw = w.w - 16, ph = w.h - 34;
+    ctx.strokeStyle = RD.col(w.grid, skin); ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) { const y = py + ph * i / 4; ctx.beginPath(); ctx.moveTo(px, y); ctx.lineTo(px + pw, y); ctx.stroke(); }
+    const label = w.label || (RD.CH[w.src] || {}).label || '';
+    RD.text(ctx, label.toUpperCase(), px, w.y + 13, 13, { color: RD.col('@dim', skin), weight: 700 });
+    RD.text(ctx, RD.fmt(w.src, v) + ' ' + RD.unitFor(w.src), px + pw, w.y + 13, 15, { color: RD.col('@text', skin), weight: 800, align: 'right' });
+    ctx.beginPath(); let started = false, lastX = px;
+    for (let k = 0; k < N; k++) {
+      const val = h.a[(h.i + k) % N]; if (isNaN(val)) continue;
+      const x = px + pw * k / (N - 1), y = py + ph * (1 - RD.frac(w, val));
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y); lastX = x;
+    }
+    if (!started) return;
+    ctx.strokeStyle = RD.col(w.line, skin); ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.stroke();
+    if (w.fill) {
+      ctx.lineTo(lastX, py + ph); let fx = px; for (let k = 0; k < N; k++) if (!isNaN(h.a[(h.i + k) % N])) { fx = px + pw * k / (N - 1); break; }
+      ctx.lineTo(fx, py + ph); ctx.closePath(); ctx.globalAlpha = 0.18; ctx.fillStyle = RD.col(w.line, skin); ctx.fill(); ctx.globalAlpha = 1;
+    }
+  }
+};
+
+/* ----- G-force meter ----- */
+RD.gTrail = [];
+RD.WT.gmeter = {
+  name: 'G-Force Meter',
+  def: { w: 240, h: 240, maxG: 1.2, ring: '@track', dot: '@warn', text: '@text', panel: 'none' },
+  props: [P('maxG', 'Max G', 'num'), ...COLORS(['ring', 'Rings'], ['dot', 'Dot'], ['text', 'Text'], ['panel', 'Panel'])],
+  draw(ctx, w, v, skin) {
+    const cx = w.x + w.w / 2, cy = w.y + w.h / 2, r = Math.min(w.w, w.h) / 2 - 6, mg = w.maxG || 1.2;
+    if (w.panel !== 'none') { ctx.fillStyle = RD.col(w.panel, skin); ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, 7); ctx.fill(); }
+    ctx.strokeStyle = RD.col(w.ring, skin); ctx.lineWidth = 1.5;
+    [0.33, 0.66, 1].forEach(k => { ctx.beginPath(); ctx.arc(cx, cy, r * k, 0, 7); ctx.stroke(); });
+    ctx.beginPath(); ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy); ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r); ctx.stroke();
+    const gx = RD.data.accelX, gy = RD.data.accelY;
+    const x = cx + RD.clamp(gx / mg, -1, 1) * r, y = cy - RD.clamp(gy / mg, -1, 1) * r;
+    const tr = RD.gTrail; ctx.fillStyle = RD.col(w.dot, skin);
+    for (let i = 0; i < tr.length; i++) { ctx.globalAlpha = i / tr.length * 0.4; ctx.beginPath(); ctx.arc(cx + RD.clamp(tr[i][0] / mg, -1, 1) * r, cy - RD.clamp(tr[i][1] / mg, -1, 1) * r, 3, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1; if (RD.hq) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 14; }
+    ctx.beginPath(); ctx.arc(x, y, Math.max(6, r * 0.07), 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+    const tot = Math.sqrt(gx * gx + gy * gy);
+    RD.text(ctx, tot.toFixed(2) + 'g', w.x + w.w - 4, w.y + 12, 14, { color: RD.col(w.text, skin), align: 'right', weight: 800 });
+    RD.text(ctx, 'G', w.x + 4, w.y + 12, 13, { color: RD.col('@dim', skin), weight: 800 });
+  }
+};
+
+/* ----- Compass tape ----- */
+RD.WT.compass = {
+  name: 'Compass Tape',
+  def: { w: 360, h: 56, color: '@text', accent: '@primary', panel: 'none', radius: 10 },
+  props: [...COLORS(['color', 'Text'], ['accent', 'Marker'], ['panel', 'Panel']), P('radius', 'Corner radius', 'num')],
+  draw(ctx, w, v, skin) {
+    const hd = RD.data.heading || 0, span = 120, pxDeg = w.w / span;
+    ctx.save(); RD.rr(ctx, w.x, w.y, w.w, w.h, w.radius);
+    if (w.panel !== 'none') { ctx.fillStyle = RD.col(w.panel, skin); ctx.fill(); }
+    ctx.clip();
+    const names = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+    ctx.strokeStyle = RD.col('@dim', skin); ctx.lineWidth = 2;
+    for (let d = Math.floor((hd - span / 2) / 5) * 5; d <= hd + span / 2; d += 5) {
+      const x = w.x + w.w / 2 + (d - hd) * pxDeg, dn = ((d % 360) + 360) % 360;
+      const big = dn % 45 === 0; ctx.beginPath(); ctx.moveTo(x, w.y + w.h); ctx.lineTo(x, w.y + w.h - (big ? 16 : dn % 15 === 0 ? 10 : 5)); ctx.stroke();
+      if (big) RD.text(ctx, names[dn], x, w.y + w.h * 0.36, w.h * 0.34, { color: dn === 0 ? RD.col('@warn', skin) : RD.col(w.color, skin), align: 'center', weight: 800 });
+    }
+    ctx.restore();
+    ctx.fillStyle = RD.col(w.accent, skin); ctx.beginPath(); ctx.moveTo(w.x + w.w / 2 - 8, w.y); ctx.lineTo(w.x + w.w / 2 + 8, w.y); ctx.lineTo(w.x + w.w / 2, w.y + 10); ctx.fill();
+  }
+};
+
+/* ----- Text / clock ----- */
+RD.WT.text = {
+  name: 'Text / Clock',
+  def: { w: 200, h: 40, text: '{clock}', size: 28, font: '@', color: '@text', align: 'center', weight: 700 },
+  props: [P('text', 'Text — tokens: {clock} {date} {source} {speed} {rpm} ... ', 'text'), P('size', 'Size', 'num'), P('font', 'Font', 'font'), P('align', 'Align', 'sel', ['left', 'center', 'right']),
+    P('weight', 'Weight', 'sel', ['400', '600', '700', '900']), ...COLORS(['color', 'Color'])],
+  draw(ctx, w, v, skin) {
+    const font = RD.fontOf(w.font, skin);
+    const s = RD.tokens(w.text || '');
+    const x = w.align === 'left' ? w.x : w.align === 'right' ? w.x + w.w : w.x + w.w / 2;
+    RD.text(ctx, s, x, w.y + w.h / 2, w.size, { font, color: RD.col(w.color, skin), align: w.align, weight: w.weight, ghost: null });
+  }
+};
+RD.tokens = (s) => s.replace(/\{(\w+)(:u)?\}/g, (m, k, u) => {
+  if (k === 'clock') { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  if (k === 'date') return new Date().toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  if (k === 'source') return (RD.Sources[RD.settings.source] || {}).name || '';
+  if (RD.CH[k]) return u ? RD.unitFor(k) : RD.fmt(k, RD.data[k]);
+  return m;
+});
+
+/* ----- Panel / shape ----- */
+RD.WT.panel = {
+  name: 'Panel / Shape',
+  def: { w: 300, h: 200, shape: 'rect', fill: '@panel', fill2: '', stroke: '@line', strokeW: 2, radius: 16, alpha: 1 },
+  props: [P('shape', 'Shape', 'sel', ['rect', 'circle', 'line']), ...COLORS(['fill', 'Fill'], ['fill2', 'Gradient to'], ['stroke', 'Stroke']), P('strokeW', 'Stroke width', 'num'), P('radius', 'Corner radius', 'num'), P('alpha', 'Opacity 0-1', 'num')],
+  draw(ctx, w, v, skin) {
+    ctx.globalAlpha = w.alpha == null ? 1 : w.alpha;
+    ctx.beginPath();
+    if (w.shape === 'line') { ctx.strokeStyle = RD.col(w.stroke, skin); ctx.lineWidth = w.strokeW || 2; ctx.moveTo(w.x, w.y + w.h / 2); ctx.lineTo(w.x + w.w, w.y + w.h / 2); ctx.stroke(); ctx.globalAlpha = 1; return; }
+    if (w.shape === 'circle') ctx.ellipse(w.x + w.w / 2, w.y + w.h / 2, w.w / 2, w.h / 2, 0, 0, 7); else RD.rr(ctx, w.x, w.y, w.w, w.h, w.radius);
+    if (w.fill && w.fill !== 'none') {
+      if (w.fill2) { const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h); g.addColorStop(0, RD.col(w.fill, skin)); g.addColorStop(1, RD.col(w.fill2, skin)); ctx.fillStyle = g; }
+      else ctx.fillStyle = RD.col(w.fill, skin);
+      ctx.fill();
+    }
+    if (w.stroke && w.stroke !== 'none' && w.strokeW > 0) { ctx.strokeStyle = RD.col(w.stroke, skin); ctx.lineWidth = w.strokeW; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+};
+
+/* ----- Image ----- */
+RD.imgCache = {};
+RD.WT.image = {
+  name: 'Image / Logo',
+  def: { w: 200, h: 120, img: '', alpha: 1 },
+  props: [P('img', 'Image', 'image'), P('alpha', 'Opacity 0-1', 'num')],
+  draw(ctx, w, v, skin) {
+    if (!w.img) { ctx.strokeStyle = RD.col('@dim', skin); ctx.setLineDash([6, 6]); ctx.strokeRect(w.x, w.y, w.w, w.h); ctx.setLineDash([]); RD.text(ctx, 'IMAGE', w.x + w.w / 2, w.y + w.h / 2, 16, { color: RD.col('@dim', skin), align: 'center' }); return; }
+    let im = RD.imgCache[w.img]; if (!im) { im = new Image(); im.src = w.img; RD.imgCache[w.img] = im; }
+    if (!im.complete || !im.naturalWidth) return;
+    const s = Math.min(w.w / im.naturalWidth, w.h / im.naturalHeight), iw = im.naturalWidth * s, ih = im.naturalHeight * s;
+    ctx.globalAlpha = w.alpha == null ? 1 : w.alpha; ctx.drawImage(im, w.x + (w.w - iw) / 2, w.y + (w.h - ih) / 2, iw, ih); ctx.globalAlpha = 1;
+  }
+};
+
+/* colour shade helper: amt -1..1 */
+RD._shadeC = {};
+RD.shade = (c, amt) => {
+  const key = c + amt; if (RD._shadeC[key]) return RD._shadeC[key];
+  let r, g, b, m;
+  if ((m = /^#([0-9a-f]{3,8})$/i.exec(c))) {
+    let h = m[1]; if (h.length <= 4) h = h.split('').map(x => x + x).join('');
+    r = parseInt(h.slice(0, 2), 16); g = parseInt(h.slice(2, 4), 16); b = parseInt(h.slice(4, 6), 16);
+  } else if ((m = /rgba?\(([^)]+)\)/.exec(c))) { [r, g, b] = m[1].split(',').map(Number); } else return c;
+  const f = (x) => Math.round(amt < 0 ? x * (1 + amt) : x + (255 - x) * amt);
+  return (RD._shadeC[key] = 'rgb(' + f(r) + ',' + f(g) + ',' + f(b) + ')');
+};
+
+/* ===== DATA SOURCES, DERIVED VALUES, ALERTS, PERFORMANCE ===== */
+'use strict';
+RD.defaults.mount = 'upright';
+if (!RD.settings.mount) RD.settings.mount = 'upright';
+RD.ratios = () => String(RD.settings.ratios).split(',').map(Number).filter(x => x > 0);
+
+/* ---------------- Simulator ---------------- */
+const Sim = {
+  name: 'Simulator', providesGear: true, providesG: true,
+  s: null,
+  start() {
+    this.s = { speed: 0, gear: 0, rpm: 800, thr: 0, phase: 'idle', pt: 0, dur: 2, target: 0, shiftT: 0, lat: 0, latT: 0, hdg: 40, prevV: 0 };
+    RD.data.coolant = Math.max(RD.data.coolant, 30);
+  },
+  stop() {},
+  next() {
+    const s = this.s, r = Math.random();
+    if (s.phase === 'idle' || s.phase === 'brake') {
+      s.phase = r < 0.2 ? 'launch' : 'accel'; s.target = s.phase === 'launch' ? 180 : 40 + Math.random() * 110; s.thrT = s.phase === 'launch' ? 1 : 0.35 + Math.random() * 0.45;
+    } else if (s.phase === 'accel' || s.phase === 'launch') { s.phase = 'cruise'; s.dur = 4 + Math.random() * 6; }
+    else if (s.phase === 'cruise') { s.phase = 'brake'; s.target = Math.random() < 0.35 ? 0 : 15 + Math.random() * 40; s.brk = 2.5 + Math.random() * 4; }
+    s.pt = 0;
+  },
+  tick(dt) {
+    const s = this.s, d = RD.data, ratios = RD.ratios(), redline = RD.settings.redline || 6500;
+    s.pt += dt; let a = 0;
+    const ratio = s.gear > 0 ? ratios[Math.min(s.gear, ratios.length) - 1] : 0;
+    switch (s.phase) {
+      case 'idle': s.thr = 0; if (s.pt > 2.5) this.next(); break;
+      case 'accel': case 'launch': {
+        if (s.gear === 0) s.gear = 1;
+        const shiftAt = s.phase === 'launch' ? redline - 150 : 2400 + s.thrT * 2600;
+        if (s.shiftT > 0) { s.shiftT -= dt; s.thr = 0.05; }
+        else { s.thr = RD.lerp(s.thr, s.thrT, dt * 4); if (s.rpm > shiftAt && s.gear < ratios.length) { s.gear++; s.shiftT = s.phase === 'launch' ? 0.18 : 0.35; } }
+        a = s.thr * 7.5 / Math.pow(s.gear, 0.75) * (1 - s.speed / 260) - 0.3;
+        if (s.speed >= s.target) this.next();
+        break;
+      }
+      case 'cruise': s.thr = RD.lerp(s.thr, 0.18 + Math.sin(s.pt) * 0.04, dt * 3); a = (Math.sin(s.pt * 0.7) * 0.25); if (s.pt > s.dur) this.next(); break;
+      case 'brake': s.thr = 0; a = -s.brk;
+        if (s.gear > 1 && ratio && s.speed / ratio * 1000 < 1300) s.gear--;
+        if (s.speed <= s.target + 0.5) { if (s.target < 1) { s.speed = 0; s.gear = 0; s.phase = 'idle'; s.pt = 0; } else this.next(); }
+        break;
+    }
+    s.speed = Math.max(0, s.speed + a * 3.6 * dt);
+    const rat = s.gear > 0 ? ratios[Math.min(s.gear, ratios.length) - 1] : 0;
+    let target = s.gear > 0 && s.speed > 3 ? Math.max(850, s.speed / rat * 1000) : 800 + s.thr * 3000;
+    if (s.gear === 1 && s.speed < 12 && s.thr > 0.3) target = Math.max(target, 1500 + s.thr * 2500);
+    s.rpm = RD.lerp(s.rpm, target + (Math.random() - 0.5) * 30, Math.min(1, dt * 12));
+    s.latT -= dt; if (s.latT <= 0) { s.latT = 2 + Math.random() * 5; s.latGoal = s.speed > 20 ? (Math.random() - 0.5) * 1.1 : 0; }
+    s.lat = RD.lerp(s.lat, s.latGoal || 0, dt * 1.5);
+    s.hdg = (s.hdg + s.lat * s.speed * 0.02 * dt * 10 + 360) % 360;
+    const thr = s.thr * 100, load = 15 + s.thr * 80;
+    d.speed = s.speed; d.rpm = s.rpm; d.gear = s.gear; d.throttle = thr; d.load = load;
+    d.accelY = RD.lerp(d.accelY, a / 9.81, dt * 6); d.accelX = s.lat + (Math.random() - 0.5) * 0.02;
+    d.heading = s.hdg; d.altitude = 920 + Math.sin(Date.now() / 60000) * 15;
+    d.coolant = RD.lerp(d.coolant, 88 + load * 0.08, dt * 0.03); d.oiltemp = RD.lerp(d.oiltemp, 96 + load * 0.12, dt * 0.02);
+    d.intake = RD.lerp(d.intake, 32 + load * 0.05, dt * 0.2); d.volt = 14.1 + Math.sin(Date.now() / 3000) * 0.08;
+    d.boost = RD.lerp(d.boost, -0.65 + s.thr * Math.min(1, s.rpm / 3500) * 1.75, dt * 5); d.map = (d.boost + 1.013) * 100;
+    d.maf = Math.max(2.5, s.rpm * load / 100 * 0.022); d.timing = RD.clamp(8 + s.rpm / 350 - load * 0.08, 0, 42);
+    d.afr = s.thr > 0.85 ? RD.lerp(d.afr, 12.4, dt * 4) : s.phase === 'brake' ? RD.lerp(d.afr, 19, dt * 2) : RD.lerp(d.afr, 14.7 + (Math.random() - 0.5) * 0.3, dt * 4);
+    d.fuel = Math.max(3, d.fuel - (d.fuelRate || 0) / 3600 * dt / RD.settings.tank * 100);
+    d.ambient = 28;
+  }
+};
+
+/* ---------------- GPS ---------------- */
+const GPS = {
+  id: null, last: null, fix: false, active: false,
+  start() {
+    if (this.active || !navigator.geolocation) { if (!navigator.geolocation) RD.toast('GPS not available on this device'); return; }
+    this.active = true;
+    this.id = navigator.geolocation.watchPosition(p => this.onPos(p), e => { RD.toast('GPS: ' + e.message); RD.status.gps = 'error'; }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+    RD.status.gps = 'searching';
+  },
+  stop() { if (this.id != null) navigator.geolocation.clearWatch(this.id); this.id = null; this.active = false; RD.status.gps = 'off'; },
+  onPos(p) {
+    const c = p.coords, t = p.timestamp; RD.status.gps = 'fix';
+    let spd = c.speed != null && !isNaN(c.speed) ? c.speed * 3.6 : null;
+    if (this.last) {
+      const dist = RD.haversine(this.last.lat, this.last.lon, c.latitude, c.longitude), dtt = (t - this.last.t) / 1000;
+      if (spd == null && dtt > 0) spd = dist / dtt * 3.6;
+      if (c.heading == null || isNaN(c.heading)) { if (dist > 3) RD.data.heading = RD.bearing(this.last.lat, this.last.lon, c.latitude, c.longitude); }
+    }
+    if (c.heading != null && !isNaN(c.heading) && (spd || 0) > 2) RD.data.heading = c.heading;
+    if (c.altitude != null) RD.data.altitude = c.altitude;
+    RD.data.gpsAcc = c.accuracy;
+    RD.gpsSpeed = c.accuracy < 50 ? Math.max(0, spd || 0) : RD.gpsSpeed;
+    RD.gpsTime = Date.now();
+    this.last = { lat: c.latitude, lon: c.longitude, t };
+  }
+};
+RD.haversine = (a, b, c, d) => { const R = 6371000, dl = (c - a) * D2R, dn = (d - b) * D2R, x = Math.sin(dl / 2) ** 2 + Math.cos(a * D2R) * Math.cos(c * D2R) * Math.sin(dn / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
+RD.bearing = (a, b, c, d) => { const y = Math.sin((d - b) * D2R) * Math.cos(c * D2R), x = Math.cos(a * D2R) * Math.sin(c * D2R) - Math.sin(a * D2R) * Math.cos(c * D2R) * Math.cos((d - b) * D2R); return (Math.atan2(y, x) / D2R + 360) % 360; };
+RD.gpsSpeed = 0;
+
+/* ---------------- Motion sensors (G-force) ---------------- */
+const Motion = {
+  active: false, grav: [0, 0, 0], off: RD.store.get('goff', [0, 0]), raw: [0, 0],
+  async start() {
+    if (this.active) return;
+    if (typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) { try { await DeviceMotionEvent.requestPermission(); } catch (e) {} }
+    this.h = (e) => this.on(e); window.addEventListener('devicemotion', this.h); this.active = true;
+  },
+  stop() { if (this.h) window.removeEventListener('devicemotion', this.h); this.active = false; },
+  on(e) {
+    let a = e.acceleration, ax, ay, az;
+    if (a && a.x != null) { ax = a.x; ay = a.y; az = a.z; }
+    else if (e.accelerationIncludingGravity) {
+      const g = e.accelerationIncludingGravity, k = 0.92, G = this.grav;
+      G[0] = G[0] * k + g.x * (1 - k); G[1] = G[1] * k + g.y * (1 - k); G[2] = G[2] * k + g.z * (1 - k);
+      ax = g.x - G[0]; ay = g.y - G[1]; az = g.z - G[2];
+    } else return;
+    const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    let sx, sy;
+    switch ((ang + 360) % 360) { case 90: sx = -ay; sy = ax; break; case 270: sx = ay; sy = -ax; break; case 180: sx = -ax; sy = -ay; break; default: sx = ax; sy = ay; }
+    const lat = sx / 9.81, lon = (RD.settings.mount === 'flat' ? sy : -az) / 9.81;
+    this.raw = [lat, lon];
+    if (!RD.Sources[RD.settings.source].providesG) {
+      RD.data.accelX = RD.lerp(RD.data.accelX, lat - this.off[0], 0.2);
+      RD.data.accelY = RD.lerp(RD.data.accelY, lon - this.off[1], 0.2);
+    }
+  },
+  calibrate() { this.off = this.raw.slice(); RD.store.set('goff', this.off); RD.toast('G-sensor zeroed'); }
+};
+RD.Motion = Motion; RD.GPS = GPS;
+
+/* ---------------- OBD2 over BLE (ELM327) ---------------- */
+const OBD = {
+  name: 'OBD2 (BLE)', providesGear: false,
+  SERVICES: ['0000fff0-0000-1000-8000-00805f9b34fb', '0000ffe0-0000-1000-8000-00805f9b34fb', '000018f0-0000-1000-8000-00805f9b34fb',
+    'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '49535343-fe7d-4ae5-8fa9-9fafd205e455', '0000ae30-0000-1000-8000-00805f9b34fb', '0000beef-0000-1000-8000-00805f9b34fb'],
+  dev: null, wr: null, nt: null, buf: '', pending: null, q: Promise.resolve(), running: false, proto: '', supported: null, misses: {}, baro: 101, rate: 0,
+  log: [],
+  addLog(s) { this.log.push(new Date().toLocaleTimeString() + '  ' + s); if (this.log.length > 200) this.log.shift(); RD.bus.emit('obdlog'); },
+  async start() {
+    RD.status.obd = 'disconnected';
+    GPS.start(); Motion.start();
+    if (!this.dev) RD.toast('Open menu → Connection → Connect OBD2 adapter', 4000);
+  },
+  stop() { this.running = false; },
+  native() { try { return window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins.BluetoothLe; } catch (e) { return null; } },
+  hex(bytes) { return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' '); },
+  async connect() {
+    const ble = this.native();
+    if (!ble && !navigator.bluetooth) { RD.toast('Bluetooth not available here. Use Chrome on Android, or the DashForge APK.', 5000); this.addLog('no bluetooth API'); return false; }
+    try {
+      RD.status.obd = 'connecting'; RD.bus.emit('status'); this.wr = this.nt = null;
+      if (ble) await this.connectNative(ble); else await this.connectWeb();
+      await this.init();
+      return true;
+    } catch (e) {
+      RD.status.obd = 'error'; RD.bus.emit('status'); this.addLog('Error: ' + (e.message || e)); RD.toast('OBD2: ' + (e.message || e), 5000); return false;
+    }
+  },
+  onDisc() { this.running = false; RD.status.obd = 'disconnected'; RD.bus.emit('status'); this.addLog('Disconnected'); RD.toast('OBD2 adapter disconnected'); },
+  async connectWeb() {
+    this.dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: this.SERVICES });
+    this.addLog('Selected ' + (this.dev.name || 'device'));
+    this.dev.addEventListener('gattserverdisconnected', () => this.onDisc());
+    const server = await this.dev.gatt.connect();
+    let wr = null, nt = null;
+    for (const uuid of this.SERVICES) {
+      let svc; try { svc = await server.getPrimaryService(uuid); } catch (e) { continue; }
+      for (const c of await svc.getCharacteristics()) {
+        if (!wr && (c.properties.write || c.properties.writeWithoutResponse)) wr = c;
+        if (!nt && (c.properties.notify || c.properties.indicate)) nt = c;
+      }
+      if (wr && nt) { this.addLog('Service ' + uuid.slice(0, 8)); break; }
+      wr = nt = null;
+    }
+    if (!wr || !nt) throw new Error('No ELM327 serial service found on this device');
+    await nt.startNotifications();
+    nt.addEventListener('characteristicvaluechanged', (e) => { const dv = e.target.value; let s = ''; for (let i = 0; i < dv.byteLength; i++) s += String.fromCharCode(dv.getUint8(i)); this.onText(s); });
+    this.wr = { write: async (bytes) => { if (wr.properties.writeWithoutResponse && wr.writeValueWithoutResponse) await wr.writeValueWithoutResponse(bytes); else await wr.writeValue(bytes); } };
+    this.nt = nt;
+  },
+  async connectNative(ble) {
+    await ble.initialize({ androidNeverForLocation: false });
+    const dev = await ble.requestDevice({ optionalServices: this.SERVICES });
+    const id = dev.deviceId; this.dev = dev; this.addLog('Selected ' + (dev.name || id));
+    await ble.addListener('disconnected|' + id, () => this.onDisc());
+    await ble.connect({ deviceId: id });
+    const { services } = await ble.getServices({ deviceId: id });
+    let pick = null;
+    for (const svc of services) {
+      if (!this.SERVICES.includes(svc.uuid.toLowerCase())) continue;
+      const w = svc.characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse), n = svc.characteristics.find(c => c.properties.notify || c.properties.indicate);
+      if (w && n) { pick = { s: svc.uuid, w, n }; break; }
+    }
+    if (!pick) throw new Error('No ELM327 serial service found on this device');
+    this.addLog('Service ' + pick.s.slice(0, 8));
+    await ble.addListener('notification|' + id + '|' + pick.s + '|' + pick.n.uuid, (ev) => {
+      const v = ev && ev.value; let s = '';
+      if (typeof v === 'string') { const h = v.replace(/[^0-9a-f]/gi, ''); for (let i = 0; i + 1 < h.length; i += 2) s += String.fromCharCode(parseInt(h.substr(i, 2), 16)); }
+      this.onText(s);
+    });
+    await ble.startNotifications({ deviceId: id, service: pick.s, characteristic: pick.n.uuid });
+    const wnr = !pick.w.properties.write;
+    this.wr = { write: (bytes) => ble[wnr ? 'writeWithoutResponse' : 'write']({ deviceId: id, service: pick.s, characteristic: pick.w.uuid, value: this.hex(bytes) }) };
+    this.nt = true;
+  },
+  onText(s) {
+    this.buf += s;
+    if (this.buf.indexOf('>') >= 0 && this.pending) { const out = this.buf.split('>')[0]; this.buf = ''; const p = this.pending; this.pending = null; p.res(out); }
+  },
+  send(cmd, timeout) {
+    const run = () => new Promise(async (res) => {
+      const to = setTimeout(() => { if (this.pending) { this.pending = null; this.buf = ''; res('TIMEOUT'); } }, timeout || 2500);
+      this.pending = { res: (v) => { clearTimeout(to); res(v); } };
+      const bytes = new TextEncoder().encode(cmd + '\r');
+      try {
+        for (let i = 0; i < bytes.length; i += 20) {
+          await this.wr.write(bytes.slice(i, i + 20));
+        }
+      } catch (e) { clearTimeout(to); this.pending = null; res('ERROR ' + e.message); }
+    });
+    const p = this.q.then(run); this.q = p.catch(() => {}); return p;
+  },
+  async init() {
+    RD.status.obd = 'initializing'; RD.bus.emit('status');
+    const seq = [['ATZ', 4000], ['ATE0'], ['ATL0'], ['ATS0'], ['ATH0'], ['ATAT1'], ['ATSP0']];
+    for (const [c, t] of seq) { const r = await this.send(c, t); this.addLog(c + ' → ' + r.replace(/\s+/g, ' ').trim()); }
+    const r = await this.send('0100', 12000); this.addLog('0100 → ' + r.replace(/\s+/g, ' ').trim());
+    if (/UNABLE|ERROR|TIMEOUT|NO DATA/.test(r)) { RD.status.obd = 'no-ecu'; RD.bus.emit('status'); RD.toast('Adapter connected but car ECU not responding. Is ignition ON?', 6000); }
+    this.supported = new Set();
+    this.parseSupport(r, 0);
+    for (const base of [0x20, 0x40]) {
+      if (!this.supported.has(base)) break;
+      const rr = await this.send('01' + base.toString(16).toUpperCase().padStart(2, '0'), 3000); this.parseSupport(rr, base);
+    }
+    this.proto = (await this.send('ATDPN')).replace(/[^0-9A-C]/gi, '').replace(/^A/, '');
+    const baro = this.parse(await this.send('0133'), '33'); if (baro) this.baro = baro[0];
+    this.addLog('Protocol ' + this.proto + ', ' + this.supported.size + ' PIDs supported');
+    RD.status.obd = 'live'; RD.bus.emit('status'); RD.toast('OBD2 connected — live data');
+    this.running = true; this.loop();
+  },
+  parseSupport(r, base) {
+    const want = '41' + base.toString(16).toUpperCase().padStart(2, '0');
+    const s = r.replace(/[\s>]/g, '').toUpperCase(), i = s.indexOf(want); if (i < 0) return;
+    const hex = s.substr(i + 4, 8); if (hex.length < 8) return;
+    const bits = parseInt(hex, 16);
+    for (let b = 0; b < 32; b++) if (bits & (1 << (31 - b))) this.supported.add(base + b + 1);
+  },
+  parse(r, pid) {
+    const s = r.replace(/SEARCHING\.\.\.|BUSINIT:?\s*(OK|\.\.\.)?/gi, '').replace(/[\s>]/g, '').toUpperCase();
+    const i = s.indexOf('41' + pid); if (i < 0) return null;
+    const out = []; for (let k = i + 4; k + 1 < s.length && out.length < 4; k += 2) { const b = parseInt(s.substr(k, 2), 16); if (isNaN(b)) break; out.push(b); }
+    return out;
+  },
+  apply(pid, b) {
+    const d = RD.data, A = b[0], B = b[1] || 0;
+    switch (pid) {
+      case '0C': d.rpm = (A * 256 + B) / 4; break;
+      case '0D': d.speed = A; break;
+      case '05': d.coolant = A - 40; break;
+      case '0F': d.intake = A - 40; break;
+      case '11': d.throttle = A * 100 / 255; break;
+      case '04': d.load = A * 100 / 255; break;
+      case '0B': d.map = A; d.boost = (A - this.baro) / 100; break;
+      case '10': d.maf = (A * 256 + B) / 100; break;
+      case '42': d.volt = (A * 256 + B) / 1000; break;
+      case '2F': d.fuel = A * 100 / 255; break;
+      case '0E': d.timing = A / 2 - 64; break;
+      case '5C': d.oiltemp = A - 40; break;
+      case '46': d.ambient = A - 40; break;
+    }
+  },
+  async loop() {
+    const list = (s) => String(s).split(',').map(x => x.trim().toUpperCase()).filter(p => p && (!this.supported || !this.supported.size || this.supported.has(parseInt(p, 16))));
+    const fast = list(RD.settings.obdFast), slow = list(RD.settings.obdSlow);
+    let si = 0, n = 0, t0 = performance.now();
+    while (this.running) {
+      const batch = fast.slice(); if (slow.length) batch.push(slow[si++ % slow.length]);
+      for (const pid of batch) {
+        if ((this.misses[pid] || 0) > 3) continue;
+        const r = await this.send('01' + pid, 1500);
+        const b = this.parse(r, pid);
+        if (b && b.length) { this.apply(pid, b); this.misses[pid] = 0; n++; } else if (/NO DATA|\?/.test(r)) this.misses[pid] = (this.misses[pid] || 0) + 1;
+        if (!this.running) return;
+      }
+      const el = performance.now() - t0; if (el > 2000) { this.rate = n / el * 1000; n = 0; t0 = performance.now(); }
+    }
+  },
+  async readDTC() {
+    if (RD.status.obd !== 'live') return { err: 'Connect to OBD2 first' };
+    const wasRunning = this.running; this.running = false; await this.q;
+    const r = await this.send('03', 5000), r7 = await this.send('07', 5000);
+    const isCAN = /^[6-9]$/.test(this.proto);
+    const decode = (resp, mode) => {
+      const codes = [];
+      resp.split(/[\r\n]+/).forEach(line => {
+        let s = line.replace(/\s/g, '').toUpperCase(); const i = s.indexOf(mode); if (i !== 0) return;
+        s = s.slice(2); if (isCAN) s = s.slice(2);
+        for (let k = 0; k + 4 <= s.length; k += 4) {
+          const h = s.substr(k, 4); if (h === '0000') continue;
+          const c = parseInt(h[0], 16); codes.push('PCBU'[c >> 2] + (c & 3) + h.slice(1));
+        }
+      });
+      return codes;
+    };
+    const out = { stored: decode(r, '43'), pending: decode(r7, '47') };
+    RD.data.dtcCount = out.stored.length;
+    if (wasRunning) { this.running = true; this.loop(); }
+    return out;
+  },
+  async clearDTC() {
+    if (RD.status.obd !== 'live') return false;
+    const wasRunning = this.running; this.running = false; await this.q;
+    const r = await this.send('04', 5000); RD.data.dtcCount = 0;
+    if (wasRunning) { this.running = true; this.loop(); }
+    return /44/.test(r.replace(/\s/g, ''));
+  }
+};
+RD.OBD = OBD;
+
+const GPSSource = {
+  name: 'GPS + Sensors', providesGear: false,
+  start() { GPS.start(); Motion.start(); },
+  stop() {},
+  tick(dt) {
+    const d = RD.data;
+    const stale = Date.now() - (RD.gpsTime || 0) > 4000;
+    d.speed = RD.lerp(d.speed, stale ? 0 : RD.gpsSpeed, Math.min(1, dt * 3));
+  }
+};
+
+RD.status = { gps: 'off', obd: 'off' };
+RD.Sources = { sim: Sim, gps: GPSSource, obd: OBD };
+
+RD.setSource = (k) => {
+  const cur = RD.Sources[RD.settings.source]; if (cur && cur.stop) cur.stop();
+  if (k !== 'obd' && k !== 'gps') { GPS.stop(); }
+  RD.settings.source = k; RD.saveSettings();
+  const s = RD.Sources[k]; if (s.start) s.start();
+  if (k !== 'sim') { ['rpm', 'throttle', 'load', 'boost', 'maf', 'map'].forEach(c => RD.data[c] = 0); RD.data.gear = 0; }
+  RD.bus.emit('status');
+};
+
+/* ---------------- Derived values: trip, economy, gear, power ---------------- */
+RD.trip = Object.assign({ dist: 0, time: 0, moving: 0, max: 0, fuel: 0 }, RD.store.get('trip', {}));
+RD.resetTrip = () => { RD.trip = { dist: 0, time: 0, moving: 0, max: 0, fuel: 0 }; RD.store.set('trip', RD.trip); RD.toast('Trip reset'); };
+RD._prevSpeed = 0; RD._saveT = 0;
+RD.derive = (dt) => {
+  const d = RD.data, src = RD.Sources[RD.settings.source], t = RD.trip;
+  if (src.tick) src.tick(dt);
+  if (RD.settings.source === 'obd' && RD.status.obd !== 'live' && RD.gpsTime && Date.now() - RD.gpsTime < 4000) d.speed = RD.lerp(d.speed, RD.gpsSpeed, Math.min(1, dt * 3));
+  if (!src.providesGear) {
+    if (d.speed < 3 || d.rpm < 500) d.gear = 0;
+    else { const r = d.speed / d.rpm * 1000, rs = RD.ratios(); let best = 0, bd = 1e9; rs.forEach((x, i) => { const e = Math.abs(Math.log(r / x)); if (e < bd) { bd = e; best = i + 1; } }); if (bd < 0.25) d.gear = best; }
+  }
+  const a = (d.speed - RD._prevSpeed) / 3.6 / Math.max(dt, 1e-3); RD._prevSpeed = d.speed;
+  if (!src.providesG && !RD.Motion.active) d.accelY = RD.lerp(d.accelY, a / 9.81, Math.min(1, dt * 3));
+  const v = d.speed / 3.6, P = 1250 * Math.max(0, a) * v + 0.5 * 1.2 * 0.7 * v * v * v + 1250 * 9.81 * 0.012 * v;
+  d.hp = RD.lerp(d.hp, (d.throttle > 5 || RD.settings.source !== 'sim') ? P / 745.7 : 0, Math.min(1, dt * 4));
+  t.dist += d.speed / 3600 * dt; t.time += dt; if (d.speed > 2) t.moving += dt; if (d.speed > t.max) t.max = d.speed;
+  d.fuelRate = d.maf > 0 ? d.maf / 14.7 / 745 * 3600 : 0;
+  t.fuel += d.fuelRate / 3600 * dt;
+  d.eco = d.fuelRate > 0.2 && d.speed > 3 ? Math.min(99, d.speed / d.fuelRate) : d.speed > 3 ? 99 : 0;
+  d.tripDist = t.dist; d.tripTime = t.time; d.avgSpeed = t.moving > 1 ? t.dist / (t.moving / 3600) : 0; d.maxSpeed = t.max;
+  d.tripFuel = t.fuel; d.avgEco = t.fuel > 0.01 ? t.dist / t.fuel : 0; d.tripCost = t.fuel * RD.settings.fuelPrice;
+  d.range = d.fuel / 100 * RD.settings.tank * (d.avgEco > 1 ? d.avgEco : 12);
+  RD.gTrail.push([d.accelX, d.accelY]); if (RD.gTrail.length > 40) RD.gTrail.shift();
+  RD._saveT += dt; if (RD._saveT > 5) { RD._saveT = 0; RD.store.set('trip', t); }
+  RD.Perf.tick(dt);
+};
+
+/* ---------------- Alerts (Trigger → Action) ---------------- */
+RD.defaults.alerts = [
+  { on: true, src: 'coolant', op: '>', val: 108, msg: 'Engine temperature high', beep: true, speak: true, flash: true },
+  { on: true, src: 'volt', op: '<', val: 11.8, msg: 'Battery voltage low', beep: true, speak: true, flash: true },
+  { on: true, src: 'fuel', op: '<', val: 10, msg: 'Fuel level low', beep: true, speak: true, flash: false },
+  { on: false, src: 'speed', op: '>', val: 100, msg: 'Speed limit exceeded', beep: true, speak: false, flash: true },
+  { on: true, src: 'rpm', op: '>', val: 6800, msg: 'Over rev', beep: true, speak: false, flash: true }
+];
+if (!RD.settings.alerts) RD.settings.alerts = RD.clone(RD.defaults.alerts);
+RD.alertState = {};
+RD.audio = null;
+RD.beep = (freq, n) => {
+  try {
+    RD.audio = RD.audio || new (window.AudioContext || window.webkitAudioContext)();
+    const ac = RD.audio; if (ac.state === 'suspended') ac.resume();
+    for (let i = 0; i < (n || 2); i++) {
+      const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + i * 0.22;
+      o.type = 'square'; o.frequency.value = freq || 880; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.25 * RD.settings.volume, t + 0.01); g.gain.linearRampToValueAtTime(0, t + 0.16);
+      o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + 0.18);
+    }
+  } catch (e) {}
+};
+RD.speak = (msg) => { try { if (!RD.settings.voice || !window.speechSynthesis) return; const u = new SpeechSynthesisUtterance(msg); u.volume = RD.settings.volume; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {} };
+RD.activeAlert = null;
+RD.checkAlerts = () => {
+  const now = Date.now(); let top = null;
+  (RD.settings.alerts || []).forEach((al, i) => {
+    if (!al.on) return;
+    const v = RD.toDisp(al.src, RD.data[al.src]);
+    const hit = al.op === '<' ? v < al.val : v > al.val;
+    const st = RD.alertState[i] = RD.alertState[i] || { active: false, last: 0 };
+    if (al.src === 'fuel' && RD.settings.source === 'gps') return;
+    if (hit && !st.active && now - st.last > 15000) {
+      st.active = true; st.last = now;
+      if (al.beep) RD.beep(al.src === 'rpm' ? 1200 : 880, al.src === 'rpm' ? 1 : 2);
+      if (al.speak) RD.speak(al.msg);
+    }
+    if (!hit) {
+      const hyst = Math.abs(al.val) * 0.02;
+      if (al.op === '<' ? v > al.val + hyst : v < al.val - hyst) st.active = false;
+    }
+    if (st.active && al.flash) top = al;
+  });
+  RD.activeAlert = top;
+};
+
+/* ---------------- Performance timer ---------------- */
+RD.Perf = {
+  state: 'off', t: 0, dist: 0, max: 0, res: {}, hist: RD.store.get('perf', []),
+  targets() { return RD.imp() ? [{ k: '0-30 mph', v: 48.28 }, { k: '0-60 mph', v: 96.56 }, { k: '0-100 mph', v: 160.9 }] : [{ k: '0-60 km/h', v: 60 }, { k: '0-100 km/h', v: 100 }, { k: '0-150 km/h', v: 150 }, { k: '0-200 km/h', v: 200 }]; },
+  arm() { this.state = 'armed'; this.res = {}; this.t = 0; this.dist = 0; this.max = 0; RD.toast(RD.data.speed > 1 ? 'Armed — come to a full stop' : 'Armed — launch when ready'); },
+  cancel() { this.state = 'off'; },
+  tick(dt) {
+    const s = RD.data.speed;
+    if (this.state === 'armed') { if (s < 1) this.ready = true; if (this.ready && s >= 1) { this.state = 'run'; this.t = 0; this.dist = 0; this.ready = false; } return; }
+    if (this.state !== 'run') return;
+    this.t += dt; this.dist += s / 3.6 * dt; this.max = Math.max(this.max, s);
+    this.targets().forEach(tg => { if (!this.res[tg.k] && s >= tg.v) this.res[tg.k] = this.t; });
+    [['60 ft', 18.288], ['1/8 mile', 201.17], ['1/4 mile', 402.34]].forEach(([k, m]) => { if (!this.res[k] && this.dist >= m) this.res[k] = this.t; });
+    if (this.res['1/4 mile'] || s < this.max - 15 || this.t > 60) this.finish();
+  },
+  finish() {
+    this.state = 'done';
+    if (Object.keys(this.res).length) {
+      this.hist.unshift({ at: Date.now(), res: this.res, src: RD.settings.source }); this.hist = this.hist.slice(0, 20); RD.store.set('perf', this.hist);
+      RD.beep(1400, 1);
+    }
+  }
+};
+
+/* ===== TRIP LOGGER: auto start/end, GPS track, speed log, overspeed ===== */
+'use strict';
+RD.defaults.autoTrip = true; RD.defaults.speedLimit = 80;
+if (RD.settings.autoTrip == null) RD.settings.autoTrip = true;
+if (RD.settings.speedLimit == null) RD.settings.speedLimit = 80;
+
+RD.Trips = {
+  cur: null, list: RD.store.get('trips', []), movingFor: 0, stopFor: 0, simPos: [12.9716, 77.5946], ptT: 0, spT: 0, over: false,
+  pos() {
+    if (RD.settings.source === 'sim') return this.simPos;
+    const l = RD.GPS.last; if (!l || Date.now() - (RD.gpsTime || 0) > 5000) return null; return [l.lat, l.lon];
+  },
+  start(manual) {
+    if (this.cur) return;
+    this.cur = { id: RD.uid(), start: Date.now(), end: 0, dist: 0, max: 0, moving: 0, over: 0, fuel: 0, pts: [], spd: [], src: RD.settings.source, manual: !!manual };
+    this.stopFor = 0; RD.bus.emit('trip');
+    RD.toast(manual ? 'Trip started' : 'Driving detected — trip recording started');
+  },
+  end(reason) {
+    const c = this.cur; if (!c) return; this.cur = null; c.end = Date.now();
+    RD.bus.emit('trip');
+    if (c.dist < 0.1 && !c.manual) return;
+    c.avg = c.moving > 0 ? c.dist / (c.moving / 3600) : 0;
+    this.list.unshift(c); this.list = this.list.slice(0, 60);
+    if (!this.save()) { this.list.forEach((t, i) => { if (i > 10) t.pts = t.pts.filter((_, k) => k % 3 === 0); }); this.save(); }
+    RD.toast('Trip saved: ' + RD.fmt('tripDist', c.dist) + ' ' + RD.unitFor('tripDist') + (reason ? ' (' + reason + ')' : ''));
+  },
+  save() { return RD.store.set('trips', this.list); },
+  remove(id) { this.list = this.list.filter(t => t.id !== id); this.save(); },
+  tick(dt) {
+    const s = RD.data.speed;
+    if (RD.settings.source === 'sim') {
+      const h = RD.data.heading * D2R, m = s / 3.6 * dt;
+      this.simPos = [this.simPos[0] + Math.cos(h) * m / 111320, this.simPos[1] + Math.sin(h) * m / (111320 * Math.cos(this.simPos[0] * D2R))];
+    }
+    if (!this.cur) {
+      if (!RD.settings.autoTrip) return;
+      this.movingFor = s > 8 ? this.movingFor + dt : 0;
+      if (this.movingFor > 15) { this.start(false); this.movingFor = 0; }
+      return;
+    }
+    const c = this.cur;
+    c.dist += s / 3600 * dt; if (s > 2) c.moving += dt; if (s > c.max) c.max = s; c.fuel += (RD.data.fuelRate || 0) / 3600 * dt;
+    const lim = RD.settings.speedLimit;
+    if (lim > 0) { const sd = RD.toDisp('speed', s); if (sd > lim && !this.over) { this.over = true; c.over++; } else if (sd < lim - 3) this.over = false; }
+    this.ptT += dt; this.spT += dt;
+    if (this.spT >= 2) { this.spT = 0; c.spd.push(Math.round(s)); if (c.spd.length > 5400) c.spd = c.spd.filter((_, i) => i % 2 === 0); }
+    if (this.ptT >= 3) {
+      this.ptT = 0; const p = this.pos();
+      if (p) {
+        const last = c.pts[c.pts.length - 1];
+        if (!last || RD.haversine(last[0], last[1], p[0], p[1]) > 15) c.pts.push([+p[0].toFixed(5), +p[1].toFixed(5), Math.round(s)]);
+        if (c.pts.length > 3000) c.pts = c.pts.filter((_, i) => i % 2 === 0);
+      }
+    }
+    if (!c.manual) { this.stopFor = s < 2 ? this.stopFor + dt : 0; if (this.stopFor > 180) this.end('parked'); }
+  },
+  gpx(t) {
+    const pts = t.pts.map((p, i) => `<trkpt lat="${p[0]}" lon="${p[1]}"><time>${new Date(t.start + (t.end - t.start) * i / Math.max(1, t.pts.length - 1)).toISOString()}</time></trkpt>`).join('\n');
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="DashForge" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Trip ${new Date(t.start).toLocaleString()}</name><trkseg>\n${pts}\n</trkseg></trk></gpx>`;
+  }
+};
+
+/* draw a trip route (with optional OSM tiles) into a canvas */
+RD.drawRoute = (cv, t, skinPal) => {
+  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+  ctx.fillStyle = '#0d1420'; ctx.fillRect(0, 0, W, H);
+  if (!t.pts.length) { ctx.fillStyle = '#8899aa'; ctx.font = '16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('No GPS points recorded for this trip', W / 2, H / 2); return; }
+  let la0 = 90, la1 = -90, lo0 = 180, lo1 = -180;
+  t.pts.forEach(p => { la0 = Math.min(la0, p[0]); la1 = Math.max(la1, p[0]); lo0 = Math.min(lo0, p[1]); lo1 = Math.max(lo1, p[1]); });
+  const mx = (lon, z) => (lon + 180) / 360 * 256 * Math.pow(2, z);
+  const my = (lat, z) => { const s = Math.sin(lat * D2R); return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * 256 * Math.pow(2, z); };
+  let z = 17; while (z > 2 && (mx(lo1, z) - mx(lo0, z) > W * 0.85 || my(la0, z) - my(la1, z) > H * 0.85)) z--;
+  const cx = (mx(lo0, z) + mx(lo1, z)) / 2, cy = (my(la0, z) + my(la1, z)) / 2, ox = cx - W / 2, oy = cy - H / 2;
+  const drawLine = () => {
+    ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (let i = 1; i < t.pts.length; i++) {
+      const a = t.pts[i - 1], b = t.pts[i], sp = b[2];
+      ctx.strokeStyle = sp > RD.settings.speedLimit / (RD.imp() ? 0.621 : 1) ? '#ff3b5c' : sp > 50 ? '#ffd166' : '#2ee59d';
+      ctx.beginPath(); ctx.moveTo(mx(a[1], z) - ox, my(a[0], z) - oy); ctx.lineTo(mx(b[1], z) - ox, my(b[0], z) - oy); ctx.stroke();
+    }
+    const s = t.pts[0], e = t.pts[t.pts.length - 1];
+    [[s, '#2ee59d', 'S'], [e, '#ff3b5c', 'E']].forEach(([p, c, l]) => {
+      const x = mx(p[1], z) - ox, y = my(p[0], z) - oy; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill();
+      ctx.fillStyle = '#000'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(l, x, y);
+    });
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(W - 150, H - 18, 150, 18); ctx.fillStyle = '#ccc'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right'; ctx.fillText('© OpenStreetMap contributors', W - 4, H - 8);
+  };
+  drawLine();
+  if (!navigator.onLine) return;
+  const tiles = []; const n = Math.pow(2, z);
+  for (let tx = Math.floor(ox / 256); tx <= Math.floor((ox + W) / 256); tx++) for (let ty = Math.floor(oy / 256); ty <= Math.floor((oy + H) / 256); ty++) if (ty >= 0 && ty < n) tiles.push([tx, ty]);
+  let loaded = 0, imgs = [];
+  tiles.forEach(([tx, ty]) => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = im.onerror = () => {
+      loaded++; if (loaded < tiles.length) return;
+      ctx.fillStyle = '#0d1420'; ctx.fillRect(0, 0, W, H);
+      imgs.forEach(o => { if (o.im.naturalWidth) { ctx.globalAlpha = 0.75; ctx.drawImage(o.im, o.tx * 256 - ox, o.ty * 256 - oy); ctx.globalAlpha = 1; } });
+      ctx.fillStyle = 'rgba(5,10,20,.35)'; ctx.fillRect(0, 0, W, H); drawLine();
+    };
+    im.src = `https://tile.openstreetmap.org/${z}/${((tx % n) + n) % n}/${ty}.png`; imgs.push({ im, tx, ty });
+  });
+};
+
+/* ===== BUILT-IN SKINS ===== */
+'use strict';
+const W = (type, x, y, w, h, p) => Object.assign({ type, x, y, w, h }, p || {});
+
+/* shared screens — colours use palette refs so they re-theme with every skin */
+RD.tripScreen = () => ({
+  name: 'Trip', widgets: [
+    W('text', 40, 20, 600, 50, { text: 'TRIP COMPUTER', size: 26, align: 'left', color: '@dim', weight: '900' }),
+    W('text', 840, 20, 400, 50, { text: '{clock}', size: 30, align: 'right' }),
+    ...[['tripDist', 'Distance'], ['tripTime', 'Drive Time'], ['avgSpeed', 'Avg Speed'], ['maxSpeed', 'Max Speed']].map((c, i) =>
+      W('digital', 40 + i * 305, 90, 290, 150, { src: c[0], label: c[1], panel: '@panel', border: '@line', dec: c[0] === 'tripDist' ? 1 : '' })),
+    ...[['avgEco', 'Avg Economy'], ['tripFuel', 'Fuel Used'], ['tripCost', 'Trip Cost'], ['range', 'Range']].map((c, i) =>
+      W('digital', 40 + i * 305, 255, 290, 150, { src: c[0], label: c[1], panel: '@panel', border: '@line' })),
+    W('graph', 40, 420, 800, 270, { src: 'speed', min: 0, max: 160, secs: 120, panel: '@panel' }),
+    W('compass', 860, 420, 380, 70, { panel: '@panel' }),
+    W('digital', 860, 505, 185, 185, { src: 'altitude', panel: '@panel', border: '@line' }),
+    W('digital', 1055, 505, 185, 185, { src: 'speed', label: 'Now', panel: '@panel', border: '@line' })
+  ]
+});
+RD.gScreen = () => ({
+  name: 'G-Force', widgets: [
+    W('text', 40, 20, 600, 50, { text: 'PERFORMANCE', size: 26, align: 'left', color: '@dim', weight: '900' }),
+    W('gmeter', 40, 90, 520, 520, { maxG: 1.2 }),
+    W('digital', 600, 90, 300, 150, { src: 'accelX', label: 'Lateral', panel: '@panel', border: '@line' }),
+    W('digital', 930, 90, 310, 150, { src: 'accelY', label: 'Accel / Brake', panel: '@panel', border: '@line' }),
+    W('digital', 600, 255, 300, 150, { src: 'hp', label: 'Est. Power', panel: '@panel', border: '@line' }),
+    W('digital', 930, 255, 310, 150, { src: 'speed', panel: '@panel', border: '@line' }),
+    W('graph', 600, 420, 640, 270, { src: 'accelY', min: -1.2, max: 1.2, secs: 30, panel: '@panel', label: 'Longitudinal G' }),
+    W('text', 40, 640, 520, 40, { text: 'Tip: Menu → Performance timer for 0-100 & 1/4 mile', size: 16, color: '@dim' })
+  ]
+});
+
+RD.BUILTIN = [
+  {
+    id: 'neon', name: 'Neon Pulse', font: 'wide', glow: true,
+    bg: { type: 'radial', c1: '#0c1a38', c2: '#02040a' },
+    pal: { primary: '#00e5ff', accent: '#ff2bd6', warn: '#ff3b5c', text: '#eaf6ff', dim: '#6b86a8', track: '#14233a', face: 'none', ring: '#00e5ff', panel: 'rgba(20,40,80,0.35)', line: '#1d3558', ghost: 'rgba(0,229,255,0.06)' },
+    screens: [{
+      name: 'Drive', widgets: [
+        W('shift', 340, 22, 600, 30, { n: 15, from: 3500, to: 6500 }),
+        W('radial', 30, 90, 470, 470, { src: 'rpm', mode: 'both', face: 'none', ringW: 0, label: 'RPM', sub: 'x1000', arc: '@accent', needle: '@primary' }),
+        W('radial', 780, 90, 470, 470, { src: 'speed', min: 0, max: 240, red: 999, mode: 'arc', numDiv: 1, face: 'none', ringW: 0, label: '', sub: '', valuePos: 'center', valueSize: 0.34, arc: '@primary' }),
+        W('gear', 570, 100, 140, 160, { border: '@accent', label: 'GEAR' }),
+        W('digital', 520, 280, 240, 100, { src: 'coolant', label: 'Coolant', warnHi: 108, panel: '@panel', border: '@line' }),
+        W('digital', 520, 395, 240, 100, { src: 'boost', label: 'Boost', panel: '@panel', border: '@line' }),
+        W('digital', 520, 510, 240, 100, { src: 'volt', label: 'Battery', warnLo: 11.8, panel: '@panel', border: '@line' }),
+        W('bar', 60, 600, 400, 70, { src: 'fuel', min: 0, max: 100, label: 'FUEL', segs: 20, c1: '@warn', c2: '@primary', c3: '@primary', t1: 0.15, t2: 0.15 }),
+        W('bar', 820, 600, 400, 70, { src: 'throttle', min: 0, max: 100, label: 'THROTTLE', segs: 20, c1: '@primary', c2: '@accent', c3: '@accent' }),
+        W('text', 520, 640, 240, 40, { text: '{clock}', size: 30 })
+      ]
+    }, RD.tripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'classic', name: 'Classic Chrome', font: 'sans', glow: false,
+    bg: { type: 'grad', c1: '#1e1e1e', c2: '#070707' },
+    pal: { primary: '#ff9d00', accent: '#ffd36b', warn: '#e3262b', text: '#f4f4f4', dim: '#9a9a9a', track: '#2a2a2a', face: '#1d1d1d', ring: '#d0d0d0', panel: '#151515', line: '#333', ghost: 'rgba(255,255,255,0.05)' },
+    screens: [{
+      name: 'Analog', widgets: [
+        W('radial', 30, 100, 520, 520, { src: 'rpm', mode: 'needle', ringW: 0.05, label: 'RPM', sub: 'x1000', needle: '@primary', valueSize: 0.16 }),
+        W('radial', 730, 100, 520, 520, { src: 'speed', min: 0, max: 240, red: 999, mode: 'needle', numDiv: 1, ringW: 0.05, label: '{unit}', sub: '', needle: '@primary', valueSize: 0.16 }),
+        W('gear', 570, 130, 140, 130, { border: '@ring', label: '', panel: '#111' }),
+        W('bar', 572, 290, 58, 280, { src: 'coolant', orient: 'v', label: 'TEMP', segs: 0, radius: 6, c1: '#3d8bff', c2: '@primary', c3: '@warn', t1: 0.4 }),
+        W('bar', 650, 290, 58, 280, { src: 'fuel', min: 0, max: 100, orient: 'v', label: 'FUEL', segs: 0, radius: 6, c1: '@warn', c2: '@primary', c3: '@primary', t1: 0.2 }),
+        W('lamp', 470, 640, 110, 56, { src: 'coolant', op: '>', val: 108, icon: '⚠', label: 'TEMP' }),
+        W('lamp', 590, 640, 110, 56, { src: 'volt', op: '<', val: 11.8, icon: '', label: 'BATT' }),
+        W('lamp', 710, 640, 110, 56, { src: 'fuel', op: '<', val: 10, icon: '', label: 'FUEL', on: '#ffb000' }),
+        W('text', 30, 30, 300, 40, { text: '{clock}', size: 28, align: 'left', color: '@dim' }),
+        W('text', 950, 30, 300, 40, { text: 'TRIP {tripDist} {tripDist:u}', size: 22, align: 'right', color: '@dim', font: 'mono' })
+      ]
+    }, RD.tripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'track', name: 'Track Day', font: 'wide', glow: false,
+    bg: { type: 'solid', c1: '#000' },
+    pal: { primary: '#ffd60a', accent: '#ff8a00', warn: '#ff2d2d', text: '#ffffff', dim: '#8a8a8a', track: '#1e1e1e', face: 'none', ring: '#444', panel: '#0f0f0f', line: '#2c2c2c', ghost: 'rgba(255,255,255,0.05)' },
+    screens: [{
+      name: 'Race', widgets: [
+        W('shift', 20, 12, 1240, 44, { n: 20, shape: 'bar', from: 4500, to: 6500 }),
+        W('bar', 20, 66, 1240, 80, { src: 'rpm', label: '', showValue: false, segs: 48, gap: 0.3, radius: 2, t1: 0.7, t2: 0.85, c1: '#ffffff', c2: '@primary', c3: '@warn' }),
+        W('gear', 470, 165, 340, 380, { border: '@primary', label: '', radius: 24 }),
+        W('digital', 20, 165, 430, 200, { src: 'speed', label: 'Speed', panel: '@panel', border: '@line' }),
+        W('digital', 20, 380, 430, 165, { src: 'rpm', label: 'RPM', panel: '@panel', border: '@line' }),
+        W('digital', 830, 165, 210, 185, { src: 'coolant', label: 'Water', warnHi: 108, panel: '@panel', border: '@line' }),
+        W('digital', 1050, 165, 210, 185, { src: 'oiltemp', label: 'Oil', warnHi: 130, panel: '@panel', border: '@line' }),
+        W('digital', 830, 360, 210, 185, { src: 'boost', label: 'Boost', panel: '@panel', border: '@line' }),
+        W('digital', 1050, 360, 210, 185, { src: 'volt', label: 'Volts', warnLo: 11.8, panel: '@panel', border: '@line' }),
+        W('bar', 20, 570, 600, 60, { src: 'throttle', min: 0, max: 100, label: 'THROTTLE', segs: 0, c1: '#2bd96b', c2: '#2bd96b', c3: '#2bd96b' }),
+        W('bar', 660, 570, 600, 60, { src: 'load', min: 0, max: 100, label: 'LOAD', segs: 0 }),
+        W('text', 20, 660, 600, 44, { text: 'TIME {tripTime}', size: 26, align: 'left', color: '@dim', font: 'mono' }),
+        W('text', 660, 660, 600, 44, { text: 'MAX {maxSpeed} {maxSpeed:u}', size: 26, align: 'right', color: '@dim', font: 'mono' })
+      ]
+    }, RD.tripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'mono', name: 'Minimal Mono', font: 'sans', glow: false,
+    bg: { type: 'solid', c1: '#000' },
+    pal: { primary: '#ffffff', accent: '#bdbdbd', warn: '#ff453a', text: '#ffffff', dim: '#6e6e6e', track: '#1c1c1c', face: 'none', ring: '#333', panel: '#0c0c0c', line: '#222', ghost: 'rgba(255,255,255,0.04)' },
+    screens: [{
+      name: 'Clean', widgets: [
+        W('text', 40, 30, 300, 50, { text: '{clock}', size: 34, align: 'left', weight: '400' }),
+        W('text', 940, 30, 300, 50, { text: '{tripDist} {tripDist:u}', size: 28, align: 'right', color: '@dim', weight: '400' }),
+        W('digital', 290, 120, 700, 350, { src: 'speed', label: '-', size: 1.1 }),
+        W('bar', 340, 480, 600, 12, { src: 'rpm', label: '', showValue: false, segs: 0, radius: 6, c1: '#fff', c2: '#fff', c3: '@warn', t1: 0.8 }),
+        W('gear', 590, 505, 100, 100, { shape: 'none', label: '', color: '@dim' }),
+        W('digital', 60, 610, 270, 90, { src: 'coolant', label: 'Temp', warnHi: 108 }),
+        W('digital', 350, 610, 270, 90, { src: 'fuel', label: 'Fuel', warnLo: 10 }),
+        W('digital', 660, 610, 270, 90, { src: 'range', label: 'Range' }),
+        W('digital', 950, 610, 270, 90, { src: 'eco', label: 'Economy' })
+      ]
+    }, RD.tripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'synth', name: "Synthwave '84", font: 'seg7', glow: true,
+    bg: { type: 'synth', c1: '#2b0a4a', c2: '#07020f' },
+    pal: { primary: '#ff2fb9', accent: '#29e0ff', warn: '#ffde00', text: '#ffe9fb', dim: '#b48bd6', track: 'rgba(80,30,120,0.6)', face: 'none', ring: '#ff2fb9', panel: 'rgba(30,8,55,0.65)', line: '#5b2a8a', ghost: 'rgba(255,47,185,0.07)' },
+    screens: [{
+      name: 'Retro', widgets: [
+        W('radial', 290, 30, 700, 700, { src: 'rpm', mode: 'arcOnly', start: 160, sweep: 220, face: 'none', ringW: 0, label: '', sub: '', showValue: false, arc: '@primary', arcW: 0.08 }),
+        W('digital', 440, 170, 400, 210, { src: 'speed', label: '-', color: '@accent' }),
+        W('gear', 575, 390, 130, 140, { shape: 'none', label: '', color: '@primary' }),
+        W('digital', 30, 60, 250, 120, { src: 'rpm', label: 'RPM', panel: '@panel', border: '@line', dec: 0 }),
+        W('digital', 30, 195, 250, 120, { src: 'boost', label: 'Boost', panel: '@panel', border: '@line' }),
+        W('digital', 1000, 60, 250, 120, { src: 'coolant', label: 'Temp', warnHi: 108, panel: '@panel', border: '@line' }),
+        W('digital', 1000, 195, 250, 120, { src: 'volt', label: 'Volts', panel: '@panel', border: '@line' }),
+        W('bar', 40, 640, 420, 56, { src: 'fuel', min: 0, max: 100, label: 'FUEL', segs: 16, c1: '@warn', c2: '@accent', c3: '@accent', t1: 0.15, t2: 0.15 }),
+        W('bar', 820, 640, 420, 56, { src: 'throttle', min: 0, max: 100, label: 'GAS', segs: 16, c1: '@accent', c2: '@primary', c3: '@primary' }),
+        W('text', 490, 650, 300, 46, { text: '{clock}', size: 44, font: 'seg7', color: '@primary' })
+      ]
+    }, RD.tripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'cockpit', name: 'Glass Cockpit', font: 'cond', glow: true,
+    bg: { type: 'grad', c1: '#101a27', c2: '#04070b' },
+    pal: { primary: '#4fc3ff', accent: '#9ef01a', warn: '#ff4d4d', text: '#ffffff', dim: '#7f8ea3', track: '#1b2533', face: 'none', ring: '#3a4a60', panel: 'rgba(25,38,56,0.55)', line: '#26364c', ghost: 'rgba(79,195,255,0.06)' },
+    screens: [{
+      name: 'Cockpit', widgets: [
+        W('radial', 15, 150, 420, 420, { src: 'speed', min: 0, max: 240, red: 999, numDiv: 1, mode: 'arc', arcW: 0.05, face: 'none', ringW: 0, label: '', sub: '', valuePos: 'center', valueSize: 0.36 }),
+        W('radial', 845, 150, 420, 420, { src: 'rpm', mode: 'arc', arcW: 0.05, face: 'none', ringW: 0, label: 'RPM', sub: 'x1000', valuePos: 'center', valueSize: 0.26, arc: '@accent' }),
+        W('panel', 445, 40, 390, 640, { fill: '@panel', stroke: '@line', radius: 24 }),
+        W('text', 465, 70, 350, 40, { text: '{date}  ·  {clock}', size: 24, color: '@dim' }),
+        W('compass', 465, 110, 350, 60, {}),
+        W('gear', 580, 185, 120, 120, { shape: 'circle', border: '@primary', label: '' }),
+        W('graph', 460, 320, 360, 160, { src: 'speed', min: 0, max: 160, secs: 90 }),
+        W('digital', 460, 495, 115, 90, { src: 'range', label: 'Range', showUnit: false }),
+        W('digital', 582, 495, 115, 90, { src: 'eco', label: 'Eco', showUnit: false }),
+        W('digital', 704, 495, 115, 90, { src: 'coolant', label: 'Temp', showUnit: false, warnHi: 108 }),
+        W('bar', 470, 605, 340, 50, { src: 'fuel', min: 0, max: 100, label: 'FUEL', segs: 0, radius: 8, c1: '@warn', c2: '@primary', c3: '@primary', t1: 0.2 })
+      ]
+    }, RD.tripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'amber', name: 'Night Amber', font: 'seg7', glow: true,
+    bg: { type: 'solid', c1: '#070300' },
+    pal: { primary: '#ffb000', accent: '#ff8000', warn: '#ff3000', text: '#ffb000', dim: '#8a5a00', track: '#2a1a00', face: 'none', ring: '#3a2500', panel: 'rgba(40,24,0,0.35)', line: '#3a2500', ghost: 'rgba(255,176,0,0.08)' },
+    screens: [{
+      name: 'LCD', widgets: [
+        W('bar', 60, 50, 1160, 70, { src: 'rpm', label: '', showValue: false, segs: 50, gap: 0.35, radius: 1, t1: 0.75, t2: 0.82, c1: '@primary', c2: '@primary', c3: '@warn' }),
+        W('text', 60, 135, 400, 30, { text: 'x1000 RPM   1   2   3   4   5   6   7   8', size: 16, align: 'left', color: '@dim', font: 'mono' }),
+        W('digital', 400, 170, 520, 290, { src: 'speed', label: '-', color: '@primary' }),
+        W('gear', 180, 220, 170, 200, { shape: 'box', border: '@line', label: 'GEAR' }),
+        W('bar', 60, 200, 70, 400, { src: 'fuel', min: 0, max: 100, orient: 'v', label: 'F', segs: 12, c1: '@warn', c2: '@primary', c3: '@primary', t1: 0.17, t2: 0.17 }),
+        W('bar', 1150, 200, 70, 400, { src: 'coolant', orient: 'v', label: 'T', segs: 12, c1: '@primary', c2: '@primary', c3: '@warn', t1: 0.5, t2: 0.75 }),
+        W('digital', 940, 220, 190, 110, { src: 'volt', label: 'Volt' }),
+        W('digital', 940, 340, 190, 110, { src: 'eco', label: 'Eco' }),
+        W('digital', 180, 500, 300, 110, { src: 'tripDist', label: 'Trip' }),
+        W('digital', 500, 500, 280, 110, { src: 'range', label: 'Range' }),
+        W('digital', 800, 500, 330, 110, { src: 'tripTime', label: 'Time', showUnit: false }),
+        W('text', 490, 640, 300, 50, { text: '{clock}', size: 44, font: 'seg7', color: '@primary' })
+      ]
+    }, RD.tripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'eco', name: 'Eco Drive', font: 'sans', glow: false,
+    bg: { type: 'radial', c1: '#0a3326', c2: '#020b08' },
+    pal: { primary: '#2ee59d', accent: '#ffd166', warn: '#ef476f', text: '#eafff5', dim: '#6fa58f', track: '#123026', face: 'none', ring: '#1f5a45', panel: 'rgba(10,50,36,0.5)', line: '#1d4a3a', ghost: 'rgba(46,229,157,0.06)' },
+    screens: [{
+      name: 'Eco', widgets: [
+        W('radial', 420, 60, 440, 440, { src: 'eco', min: 0, max: 30, red: '', numDiv: 1, mode: 'arc', start: 150, sweep: 240, face: 'none', ringW: 0, label: 'INSTANT', sub: '', valuePos: 'center', valueSize: 0.3, arc: '@primary' }),
+        W('digital', 40, 60, 340, 200, { src: 'speed', panel: '@panel', border: '@line' }),
+        W('digital', 40, 275, 340, 130, { src: 'fuelRate', panel: '@panel', border: '@line' }),
+        W('bar', 50, 430, 320, 60, { src: 'load', min: 0, max: 100, label: 'ENGINE LOAD', segs: 12, c1: '@primary', c2: '@accent', c3: '@warn' }),
+        W('digital', 900, 60, 340, 140, { src: 'avgEco', panel: '@panel', border: '@line' }),
+        W('digital', 900, 215, 340, 140, { src: 'range', panel: '@panel', border: '@line' }),
+        W('digital', 900, 370, 165, 120, { src: 'tripFuel', label: 'Used', panel: '@panel', border: '@line' }),
+        W('digital', 1075, 370, 165, 120, { src: 'tripCost', label: 'Cost', panel: '@panel', border: '@line' }),
+        W('graph', 40, 515, 820, 180, { src: 'fuelRate', min: 0, max: 20, secs: 120, panel: '@panel' }),
+        W('gear', 900, 515, 160, 180, { border: '@primary', label: 'GEAR' }),
+        W('text', 1075, 560, 165, 40, { text: '{clock}', size: 34 }),
+        W('text', 1075, 620, 165, 40, { text: '{tripDist} {tripDist:u}', size: 22, color: '@dim' })
+      ]
+    }, RD.tripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'diag', name: 'Data Engineer', font: 'mono', glow: false,
+    bg: { type: 'grid', c1: '#0d1117', c2: '#0d1117' },
+    pal: { primary: '#7cffcb', accent: '#ffd400', warn: '#ff5c5c', text: '#e6edf3', dim: '#7d8590', track: '#21262d', face: 'none', ring: '#30363d', panel: '#161b22', line: '#30363d', ghost: 'rgba(124,255,203,0.05)' },
+    screens: [{
+      name: 'Engine', widgets: [
+        ...['rpm', 'speed', 'coolant', 'intake', 'oiltemp', 'load', 'throttle', 'maf', 'map', 'boost', 'timing', 'volt'].map((c, i) =>
+          W('digital', 20 + (i % 4) * 315, 20 + Math.floor(i / 4) * 165, 300, 150, { src: c, panel: '@panel', border: '@line', align: 'left', warnHi: c === 'coolant' ? 108 : '' })),
+        W('graph', 20, 520, 620, 185, { src: 'rpm', min: 0, max: 8000, secs: 60, panel: '@panel' }),
+        W('graph', 655, 520, 605, 185, { src: 'speed', min: 0, max: 200, secs: 60, panel: '@panel', line: '@accent' })
+      ]
+    }, {
+      name: 'More', widgets: [
+        ...['afr', 'fuel', 'fuelRate', 'eco', 'ambient', 'altitude', 'gpsAcc', 'heading'].map((c, i) =>
+          W('digital', 20 + (i % 4) * 315, 20 + Math.floor(i / 4) * 165, 300, 150, { src: c, panel: '@panel', border: '@line', align: 'left' })),
+        W('graph', 20, 355, 620, 170, { src: 'coolant', min: 40, max: 130, secs: 300, panel: '@panel', line: '@warn' }),
+        W('graph', 655, 355, 605, 170, { src: 'boost', min: -1, max: 1.5, secs: 60, panel: '@panel', line: '@accent' }),
+        W('graph', 20, 540, 620, 165, { src: 'throttle', min: 0, max: 100, secs: 60, panel: '@panel' }),
+        W('digital', 655, 540, 300, 165, { src: 'dtcCount', panel: '@panel', border: '@line', align: 'left', warnHi: 0 }),
+        W('digital', 970, 540, 290, 165, { src: 'hp', panel: '@panel', border: '@line', align: 'left' })
+      ]
+    }, RD.gScreen()]
+  },
+  {
+    id: 'carbon', name: 'Carbon Sport', font: 'wide', glow: true,
+    bg: { type: 'carbon', c1: '#161616', c2: '#0a0a0a' },
+    pal: { primary: '#ff1e1e', accent: '#ffffff', warn: '#ff1e1e', text: '#ffffff', dim: '#9a9a9a', track: '#2b2b2b', face: '#151515', ring: '#4a4a4a', panel: 'rgba(0,0,0,0.55)', line: '#333', ghost: 'rgba(255,255,255,0.05)' },
+    screens: [{
+      name: 'Sport', widgets: [
+        W('radial', 370, 20, 540, 540, { src: 'rpm', mode: 'both', start: 150, sweep: 240, ringW: 0.035, label: '', sub: 'x1000 rpm', showValue: false, arc: '@primary', needle: '@accent', arcW: 0.06 }),
+        W('digital', 500, 215, 280, 140, { src: 'speed', label: '-' }),
+        W('gear', 590, 370, 100, 110, { shape: 'none', label: '', color: '@primary' }),
+        W('radial', 40, 150, 300, 300, { src: 'coolant', red: 110, numDiv: 1, mode: 'arc', label: 'WATER', sub: '', valuePos: 'center', valueSize: 0.26, ringW: 0.03, arc: '@accent' }),
+        W('radial', 940, 150, 300, 300, { src: 'boost', red: 1.2, numDiv: 1, mode: 'arc', label: 'BOOST', sub: '', valuePos: 'center', valueSize: 0.26, ringW: 0.03, arc: '@accent' }),
+        W('shift', 440, 570, 400, 30, { n: 10, from: 4500, to: 6500, shape: 'rect' }),
+        W('bar', 60, 620, 480, 60, { src: 'fuel', min: 0, max: 100, label: 'FUEL', segs: 24, c1: '@primary', c2: '#fff', c3: '#fff', t1: 0.15, t2: 0.15 }),
+        W('bar', 740, 620, 480, 60, { src: 'oiltemp', label: 'OIL', segs: 24, c1: '#fff', c2: '#fff', c3: '@primary', t1: 0.7, t2: 0.8 }),
+        W('text', 40, 40, 300, 40, { text: '{clock}', size: 28, align: 'left', color: '@dim' }),
+        W('text', 940, 40, 300, 40, { text: '{tripDist} {tripDist:u}', size: 24, align: 'right', color: '@dim' })
+      ]
+    }, RD.tripScreen(), RD.gScreen()]
+  },
+  {
+    id: 'day', name: 'Daylight', font: 'sans', glow: false,
+    bg: { type: 'grad', c1: '#f1f4f8', c2: '#dce2ea' },
+    pal: { primary: '#0a63ff', accent: '#00a37a', warn: '#e01e37', text: '#0e1116', dim: '#5b6573', track: '#d3dae3', face: 'none', ring: '#9aa5b4', panel: '#ffffff', line: '#d3dae3', ghost: 'rgba(0,0,0,0.05)' },
+    screens: [{
+      name: 'Day', widgets: [
+        W('panel', 30, 30, 600, 470, { fill: '@panel', stroke: '@line', radius: 28 }),
+        W('panel', 650, 30, 600, 470, { fill: '@panel', stroke: '@line', radius: 28 }),
+        W('radial', 105, 50, 450, 450, { src: 'speed', min: 0, max: 200, red: 999, numDiv: 1, mode: 'arc', label: '', sub: '', valuePos: 'center', valueSize: 0.34, ringW: 0, arcW: 0.07 }),
+        W('radial', 725, 50, 450, 450, { src: 'rpm', mode: 'arc', label: 'RPM', sub: 'x1000', valuePos: 'center', valueSize: 0.24, ringW: 0, arcW: 0.07, arc: '@accent' }),
+        W('digital', 30, 520, 290, 170, { src: 'coolant', panel: '@panel', border: '@line', warnHi: 108 }),
+        W('digital', 340, 520, 290, 170, { src: 'fuel', panel: '@panel', border: '@line', warnLo: 10 }),
+        W('digital', 650, 520, 290, 170, { src: 'range', panel: '@panel', border: '@line' }),
+        W('panel', 960, 520, 290, 170, { fill: '@panel', stroke: '@line', radius: 10 }),
+        W('text', 960, 570, 290, 60, { text: '{clock}', size: 54, weight: '700' }),
+        W('text', 960, 640, 290, 30, { text: '{date}', size: 20, color: '@dim' }),
+        W('gear', 290, 400, 80, 80, { shape: 'none', label: '', color: '@dim' })
+      ]
+    }, RD.tripScreen(), RD.gScreen()]
+  }
+];
+
+/* normalise skin: fill widget defaults, ids */
+RD.normSkin = (s) => {
+  s.screens.forEach(sc => sc.widgets.forEach(w => {
+    const t = RD.WT[w.type]; if (!t) return;
+    const ch = RD.CH[w.src];
+    if (ch && w.src !== t.def.src && w.type !== 'shift' && w.type !== 'lamp') {
+      if (w.min == null) w.min = ch.min; if (w.max == null) w.max = ch.max;
+      if (w.type === 'radial') { if (w.numDiv == null) w.numDiv = w.src === 'rpm' ? 1000 : 1; if (w.red == null) w.red = w.src === 'rpm' ? RD.settings.redline : ''; }
+    }
+    const full = Object.assign({}, t.def, w); Object.assign(w, full);
+    if (!w.id) w.id = RD.uid(); w._v = w._v || 0;
+  }));
+  s.pal = Object.assign({ primary: '#0ff', accent: '#f0f', warn: '#f33', text: '#fff', dim: '#888', track: '#222', face: 'none', ring: '#555', panel: 'rgba(0,0,0,.4)', line: '#333', ghost: 'rgba(255,255,255,.05)' }, s.pal);
+  return s;
+};
+RD.BUILTIN.forEach(RD.normSkin);
+RD.userSkins = (RD.store.get('skins', []) || []).map(RD.normSkin);
+RD.allSkins = () => RD.BUILTIN.concat(RD.userSkins);
+RD.skinById = (id) => RD.allSkins().find(s => s.id === id) || RD.BUILTIN[0];
+RD.saveUserSkins = () => {
+  const ok = RD.store.set('skins', RD.userSkins.map(s => { const c = RD.clone(s); c.screens.forEach(sc => sc.widgets.forEach(w => delete w._v)); return c; }));
+  if (!ok) RD.toast('Storage full — export your skins and remove large images');
+};
+
+/* ===== APP: render loop, background, input, HUD ===== */
+'use strict';
+RD.$ = (s, r) => (r || document).querySelector(s);
+RD.$$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+RD.anim = {};
+RD.editing = false;
+
+/* ---------- backgrounds ---------- */
+RD.bgCache = { k: '', c: null };
+RD.drawBg = (ctx, skin, W, H) => {
+  const k = skin.id + JSON.stringify(skin.bg) + W + 'x' + H;
+  if (RD.noCache || RD.bgCache.k !== k) {
+    const c = RD.noCache ? null : document.createElement('canvas');
+    let x = ctx;
+    if (c) { c.width = W; c.height = H; x = c.getContext('2d'); }
+    const b = skin.bg || { type: 'solid', c1: '#000' }, c1 = b.c1 || '#000', c2 = b.c2 || c1;
+    if (b.type === 'radial' || b.type === 'synth') { const g = x.createRadialGradient(W / 2, H * 0.45, 10, W / 2, H / 2, Math.max(W, H) * 0.75); g.addColorStop(0, c1); g.addColorStop(1, c2); x.fillStyle = g; }
+    else if (b.type === 'solid') x.fillStyle = c1;
+    else { const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, c1); g.addColorStop(1, c2); x.fillStyle = g; }
+    x.fillRect(0, 0, W, H);
+    if (b.type === 'grid') {
+      x.strokeStyle = 'rgba(255,255,255,0.035)'; x.lineWidth = 1; const step = Math.max(16, W / 48);
+      for (let i = 0; i < W; i += step) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); }
+      for (let j = 0; j < H; j += step) { x.beginPath(); x.moveTo(0, j); x.lineTo(W, j); x.stroke(); }
+    }
+    if (b.type === 'carbon') {
+      const s = Math.max(6, Math.round(W / 160));
+      for (let i = 0; i < W; i += s * 2) for (let j = 0; j < H; j += s * 2) {
+        const g1 = x.createLinearGradient(i, j, i + s, j + s); g1.addColorStop(0, 'rgba(255,255,255,0.06)'); g1.addColorStop(1, 'rgba(0,0,0,0.25)');
+        x.fillStyle = g1; x.fillRect(i, j, s, s); x.fillRect(i + s, j + s, s, s);
+        const g2 = x.createLinearGradient(i + s, j, i + 2 * s, j + s); g2.addColorStop(0, 'rgba(0,0,0,0.3)'); g2.addColorStop(1, 'rgba(255,255,255,0.04)');
+        x.fillStyle = g2; x.fillRect(i + s, j, s, s); x.fillRect(i, j + s, s, s);
+      }
+      const v = x.createRadialGradient(W / 2, H / 2, H * 0.2, W / 2, H / 2, W * 0.7); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.7)'); x.fillStyle = v; x.fillRect(0, 0, W, H);
+    }
+    if (b.type === 'synth') {
+      const hz = H * 0.62, sun = x.createLinearGradient(0, H * 0.2, 0, hz); sun.addColorStop(0, '#ffd319'); sun.addColorStop(0.5, '#ff2975'); sun.addColorStop(1, '#8c1eff');
+      x.save(); x.globalAlpha = 0.28; x.fillStyle = sun; x.beginPath(); x.arc(W / 2, hz, H * 0.32, Math.PI, 0); x.fill();
+      x.globalCompositeOperation = 'destination-out'; for (let i = 0; i < 7; i++) { const yy = hz - H * 0.03 - i * H * 0.04; x.fillRect(0, yy, W, H * 0.008 + i * 0.6); } x.restore();
+      x.fillStyle = 'rgba(10,0,25,0.85)'; x.fillRect(0, hz, W, H - hz);
+      x.strokeStyle = 'rgba(255,47,185,0.35)'; x.lineWidth = 1.5;
+      for (let i = 0; i < 14; i++) { const y = hz + (H - hz) * Math.pow(i / 13, 2); x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); }
+      for (let i = -20; i <= 20; i++) { x.beginPath(); x.moveTo(W / 2 + i * W * 0.012, hz); x.lineTo(W / 2 + i * W * 0.09, H); x.stroke(); }
+    }
+    if (c) RD.bgCache = { k, c };
+  }
+  if (!RD.noCache) ctx.drawImage(RD.bgCache.c, 0, 0, W, H);
+};
+
+/* ---------- render one screen of a skin ---------- */
+RD.renderScreen = (ctx, skin, screen, devW, devH, s, ox, oy, dt) => {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  RD.drawBg(ctx, skin, devW, devH);
+  ctx.setTransform(s, 0, 0, s, ox, oy);
+  const scr = skin.screens[screen] || skin.screens[0];
+  for (const w of scr.widgets) {
+    const t = RD.WT[w.type]; if (!t) continue;
+    let v = RD.data[w.src];
+    if (v == null || isNaN(v)) v = 0;
+    if (dt != null && w.smooth > 0) {
+      const a = RD.anim[w.id]; const nv = a == null ? v : a + (v - a) * Math.min(1, dt * w.smooth);
+      RD.anim[w.id] = nv; v = nv;
+    }
+    try { t.draw(ctx, w, v, skin); } catch (e) { if (!RD._errShown) { RD._errShown = 1; console.error(e); } }
+  }
+};
+
+/* ---------- main stage ---------- */
+RD.view = { s: 1, ox: 0, oy: 0 };
+RD.layout = () => {
+  const st = RD.$('#stage'), cv = RD.$('#cv');
+  const r = st.getBoundingClientRect();
+  const q = RD.settings.quality;
+  RD.dpr = Math.min(window.devicePixelRatio || 1, q === 'low' ? 1 : q === 'high' ? 2.5 : (RD.lowPerf ? 1 : 1.75));
+  cv.width = Math.round(r.width * RD.dpr); cv.height = Math.round(r.height * RD.dpr);
+  cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
+  const s = Math.min(r.width / RD.W, r.height / RD.H);
+  RD.scale = s; RD.view = { s, ox: (r.width - RD.W * s) / 2, oy: (r.height - RD.H * s) / 2, rect: r };
+  RD.faceCache.clear(); RD.bgCache.k = '';
+};
+RD.skin = () => RD.skinById(RD.settings.skin);
+RD.setSkin = (id) => { RD.settings.skin = id; RD.settings.screen = 0; RD.saveSettings(); RD.faceCache.clear(); RD.anim = {}; RD.updateDots(); };
+RD.setScreen = (i) => {
+  const n = RD.skin().screens.length; RD.settings.screen = ((i % n) + n) % n; RD.saveSettings(); RD.updateDots();
+  const name = RD.skin().screens[RD.settings.screen].name; RD.flashName(name);
+};
+RD.flashName = (n) => { const e = RD.$('#scrname'); e.textContent = n; e.classList.add('show'); clearTimeout(RD._fn); RD._fn = setTimeout(() => e.classList.remove('show'), 1200); };
+RD.updateDots = () => {
+  const n = RD.skin().screens.length, d = RD.$('#dots');
+  d.innerHTML = n > 1 ? Array.from({ length: n }, (_, i) => `<i class="${i === RD.settings.screen ? 'on' : ''}" data-i="${i}"></i>`).join('') : '';
+};
+
+/* ---------- loop ---------- */
+RD.fps = 0; RD._frames = 0; RD._fpsT = 0; RD._last = 0; RD._alertT = 0; RD._slow = 0;
+RD.frame = (now) => {
+  requestAnimationFrame(RD.frame);
+  const minDt = 1000 / (RD.settings.maxFps || 60) - 1;
+  if (now - RD._last < minDt) return;
+  const dt = Math.min(0.1, (now - RD._last) / 1000 || 0.016); RD._last = now;
+  const t0 = performance.now();
+  RD.derive(dt); RD.Trips.tick(dt);
+  RD._alertT += dt; if (RD._alertT > 0.25) { RD._alertT = 0; RD.checkAlerts(); RD.updateHud(); }
+  const cv = RD.$('#cv'), ctx = cv.getContext('2d'), v = RD.view, d = RD.dpr;
+  RD.renderScreen(ctx, RD.skin(), RD.settings.screen, cv.width, cv.height, v.s * d, v.ox * d, v.oy * d, dt);
+  if (RD.editing && RD.Editor) RD.Editor.overlay(ctx);
+  const al = RD.activeAlert, ab = RD.$('#alertbar');
+  if (al) { ab.textContent = '⚠ ' + al.msg; ab.classList.add('show'); RD.$('#stage').classList.toggle('alarm', Date.now() % 900 < 450); }
+  else if (ab.classList.contains('show')) { ab.classList.remove('show'); RD.$('#stage').classList.remove('alarm'); }
+  RD._frames++; RD._fpsT += dt;
+  const ft = performance.now() - t0; RD._slow = RD._slow * 0.95 + ft * 0.05;
+  if (RD._fpsT >= 1) {
+    RD.fps = RD._frames / RD._fpsT; RD._frames = 0; RD._fpsT = 0;
+    RD.$('#fps').textContent = RD.settings.fps ? RD.fps.toFixed(0) + ' fps · ' + RD._slow.toFixed(1) + ' ms' : '';
+    if (RD.settings.quality === 'auto') {
+      if (!RD.lowPerf && (RD._slow > 22 || RD.fps < 24)) { RD.lowPerf = true; RD.hq = false; RD.layout(); }
+    } else RD.hq = RD.settings.quality !== 'low';
+  }
+};
+
+/* ---------- HUD ---------- */
+RD.updateHud = () => {
+  const src = RD.settings.source, st = RD.status;
+  const pill = RD.$('#srcpill');
+  let txt = RD.Sources[src].name, cls = 'ok';
+  if (src === 'obd') { txt = 'OBD2 · ' + st.obd; cls = st.obd === 'live' ? 'ok' : st.obd === 'error' || st.obd === 'no-ecu' ? 'bad' : 'warn'; }
+  if (src === 'gps') { txt = 'GPS · ' + st.gps; cls = st.gps === 'fix' ? 'ok' : st.gps === 'error' ? 'bad' : 'warn'; }
+  if (src === 'sim') { txt = 'Demo mode'; cls = 'warn'; }
+  pill.textContent = txt; pill.className = 'pill ' + cls;
+  const tp = RD.$('#trippill');
+  if (RD.Trips.cur) { tp.style.display = ''; tp.textContent = '● REC ' + RD.fmt('tripDist', RD.Trips.cur.dist) + ' ' + RD.unitFor('tripDist'); } else tp.style.display = 'none';
+  const pp = RD.$('#perfpill');
+  if (RD.Perf.state === 'armed' || RD.Perf.state === 'run') { pp.style.display = ''; pp.textContent = RD.Perf.state === 'armed' ? 'PERF ARMED' : 'PERF ' + RD.Perf.t.toFixed(1) + 's'; } else pp.style.display = 'none';
+  const auto = RD.settings.autoNight && (new Date().getHours() >= 19 || new Date().getHours() < 6);
+  RD.$('#night').style.opacity = RD.settings.night || auto ? 0.45 : (1 - RD.settings.brightness);
+  if (RD.Media) RD.Media.guard();
+};
+RD.showHud = () => {
+  document.body.classList.add('hud-on'); clearTimeout(RD._hudT);
+  RD._hudT = setTimeout(() => { if (!RD.editing) document.body.classList.remove('hud-on'); }, 4500);
+};
+
+/* ---------- input: swipe screens, tap HUD ---------- */
+RD.initInput = () => {
+  const st = RD.$('#stage'); let sx = 0, sy = 0, t0 = 0, down = false;
+  st.addEventListener('pointerdown', (e) => {
+    RD.unlockAudio(); RD.requestWake();
+    if (RD.editing) return RD.Editor.down(e);
+    down = true; sx = e.clientX; sy = e.clientY; t0 = Date.now();
+  });
+  window.addEventListener('pointermove', (e) => { if (RD.editing) RD.Editor.move(e); });
+  window.addEventListener('pointerup', (e) => {
+    if (RD.editing) return RD.Editor.up(e);
+    if (!down) return; down = false;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) RD.setScreen(RD.settings.screen + (dx < 0 ? 1 : -1));
+    else if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && Date.now() - t0 < 400) RD.showHud();
+  });
+  RD.$('#dots').addEventListener('click', (e) => { const i = e.target.dataset.i; if (i != null) RD.setScreen(+i); });
+  window.addEventListener('resize', () => { clearTimeout(RD._rz); RD._rz = setTimeout(RD.layout, 120); });
+  window.addEventListener('keydown', (e) => {
+    if (RD.editing) return RD.Editor.key(e);
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'ArrowRight') RD.setScreen(RD.settings.screen + 1);
+    if (e.key === 'ArrowLeft') RD.setScreen(RD.settings.screen - 1);
+    if (e.key === 'm') RD.UI.menu();
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') RD.requestWake(true); });
+};
+RD.unlockAudio = () => { if (RD._au) return; RD._au = 1; try { RD.audio = RD.audio || new (window.AudioContext || window.webkitAudioContext)(); RD.audio.resume(); } catch (e) {} };
+RD.wakeLock = null;
+RD.requestWake = async (force) => {
+  if (!RD.settings.wake || !('wakeLock' in navigator)) return;
+  if (RD.wakeLock && !force) return;
+  try { RD.wakeLock = await navigator.wakeLock.request('screen'); RD.wakeLock.addEventListener('release', () => RD.wakeLock = null); } catch (e) {}
+};
+RD.fullscreen = () => {
+  const d = document.documentElement;
+  if (!document.fullscreenElement) { (d.requestFullscreen || d.webkitRequestFullscreen || (() => {})).call(d); try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }
+  else (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+};
+
+/* ---------- boot ---------- */
+RD.boot = () => {
+  RD.hq = RD.settings.quality !== 'low';
+  if (!RD.skinById(RD.settings.skin)) RD.settings.skin = 'neon';
+  RD.layout(); RD.updateDots(); RD.initInput();
+  RD.Sources[RD.settings.source] ? RD.setSource(RD.settings.source) : RD.setSource('sim');
+  if (RD.Media) RD.Media.init();
+  RD.UI.initHud();
+  requestAnimationFrame(RD.frame);
+  RD.showHud();
+  if (!RD.store.get('welcomed', false)) { RD.store.set('welcomed', true); setTimeout(() => RD.UI.welcome(), 500); }
+  if ('serviceWorker' in navigator && location.protocol === 'https:' && !window.Capacitor) navigator.serviceWorker.register('sw.js').catch(() => {});
+};
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); RD.installEvt = e; });
+window.addEventListener('load', RD.boot);
+
+/* ===== UI PANELS: menu, skins, connection, trips, perf, DTC, alerts, settings, device check, media ===== */
+'use strict';
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+RD.esc = esc;
+const chOpts = (sel) => RD.chList().map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${esc(RD.CH[k].label)}</option>`).join('');
+RD.download = (name, text, type) => {
+  const b = new Blob([text], { type: type || 'application/json' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+};
+
+RD.UI = {
+  modal(title, html, o) {
+    o = o || {}; RD.UI.close();
+    const m = document.createElement('div'); m.className = 'modal-wrap'; m.id = 'modal';
+    m.innerHTML = `<div class="modal ${o.wide ? 'wide' : ''}"><header><button class="back" title="Back">‹</button><h2>${esc(title)}</h2><button class="x" title="Close">✕</button></header><div class="body">${html}</div></div>`;
+    document.body.appendChild(m);
+    m.querySelector('.x').onclick = () => RD.UI.close();
+    m.querySelector('.back').onclick = () => { if (o.back) o.back(); else RD.UI.menu(); };
+    m.addEventListener('pointerdown', (e) => { if (e.target === m) RD.UI.close(); });
+    RD.UI._onClose = o.onClose;
+    return m.querySelector('.body');
+  },
+  close() { const m = RD.$('#modal'); if (m) { m.remove(); if (RD.UI._onClose) { const f = RD.UI._onClose; RD.UI._onClose = null; f(); } } },
+  initHud() {
+    RD.$('#btn-menu').onclick = () => RD.UI.menu();
+    RD.$('#btn-media').onclick = () => RD.Media.toggle();
+    RD.$('#btn-full').onclick = () => RD.fullscreen();
+    RD.$('#btn-trip').onclick = () => RD.UI.trips();
+    RD.bus.on('status', () => RD.updateHud());
+  },
+  welcome() {
+    const b = RD.UI.modal('Welcome to DashForge', `
+      <p class="lead">Your car dashboard, built your way.</p>
+      <ul class="feat"><li><b>Swipe</b> left/right to change screens. <b>Tap</b> to show controls.</li>
+      <li>You're in <b>Demo mode</b> (simulated drive). Switch to <b>GPS</b> (no adapter needed) or <b>OBD2</b> in Menu → Connection.</li>
+      <li>Pick from ${RD.BUILTIN.length} skins, or tap <b>Edit Dashboard</b> to drag, resize and restyle anything.</li>
+      <li>▶ opens the media dock: YouTube and one-tap app launcher.</li></ul>
+      <div class="row"><button class="btn primary" id="w-skins">Choose a skin</button><button class="btn" id="w-dev">Check this device</button><button class="btn ghost" id="w-go">Start driving</button></div>`);
+    b.querySelector('#w-skins').onclick = () => RD.UI.skins();
+    b.querySelector('#w-dev').onclick = () => RD.UI.device();
+    b.querySelector('#w-go').onclick = () => RD.UI.close();
+  },
+  menu() {
+    const tiles = [
+      ['skins', '🎨', 'Skins', RD.skin().name], ['edit', '✏️', 'Edit Dashboard', 'Drag, resize, restyle'], ['conn', '🔌', 'Connection', RD.Sources[RD.settings.source].name],
+      ['trips', '🗺️', 'Trips & GPS Log', RD.Trips.cur ? 'Recording…' : RD.Trips.list.length + ' saved'], ['perf', '⏱️', 'Performance', '0-100 · ¼ mile'], ['media', '▶️', 'Media & Apps', 'YouTube · launcher'],
+      ['dtc', '🔧', 'Fault Codes', 'Read / clear'], ['alerts', '🔔', 'Alerts', (RD.settings.alerts || []).filter(a => a.on).length + ' active'], ['settings', '⚙️', 'Settings', 'Units, display, car'],
+      ...(RD.installEvt ? [['install', '⬇️', 'Install App', 'Add to home screen']] : []),
+      ['device', '📱', 'Device Check', 'Tablet compatibility'], ['io', '💾', 'Backup & Share', 'Import / export'], ['night', '🌙', 'Night Mode', RD.settings.night ? 'On' : 'Off']
+    ];
+    const b = RD.UI.modal('Menu', `<div class="tiles">${tiles.map(t => `<button class="tile" data-k="${t[0]}"><span class="ic">${t[1]}</span><b>${t[2]}</b><small>${esc(t[3])}</small></button>`).join('')}</div>
+      <p class="foot">DashForge v${RD.VERSION} · Trip ${RD.fmt('tripDist', RD.trip.dist)} ${RD.unitFor('tripDist')} <button class="link" id="rt">reset</button></p>`, { back: () => RD.UI.close() });
+    b.querySelector('#rt').onclick = () => { RD.resetTrip(); RD.UI.menu(); };
+    b.querySelectorAll('.tile').forEach(t => t.onclick = () => {
+      const k = t.dataset.k;
+      if (k === 'edit') { RD.UI.close(); RD.Editor.start(); }
+      else if (k === 'media') { RD.UI.close(); RD.Media.open(); }
+      else if (k === 'install') { RD.installEvt.prompt(); RD.installEvt.userChoice.finally(() => { RD.installEvt = null; RD.UI.close(); }); }
+      else if (k === 'night') { RD.settings.night = !RD.settings.night; RD.saveSettings(); RD.updateHud(); RD.UI.menu(); }
+      else RD.UI[k]();
+    });
+  },
+
+  /* ---------- skins gallery ---------- */
+  skins() {
+    const all = RD.allSkins();
+    const b = RD.UI.modal('Skins', `<div class="skins">${all.map(s => `
+      <div class="skin ${s.id === RD.settings.skin ? 'cur' : ''}" data-id="${s.id}">
+        <canvas width="320" height="180"></canvas>
+        <div class="meta"><b>${esc(s.name)}</b><small>${s.user ? 'Custom' : 'Built-in'} · ${s.screens.length} screens</small></div>
+        <div class="acts"><button class="btn sm primary" data-a="use">Use</button><button class="btn sm" data-a="dup">Customize</button>${s.user ? '<button class="btn sm danger" data-a="del">Delete</button>' : ''}</div>
+      </div>`).join('')}</div>
+      <div class="row"><button class="btn" id="sk-imp">Import skin file…</button><button class="btn" id="sk-new">New blank skin</button></div>`, { wide: true });
+    RD.UI.thumbs(b);
+    b.querySelectorAll('.skin').forEach(el => el.addEventListener('click', (e) => {
+      const id = el.dataset.id, a = e.target.dataset.a;
+      if (a === 'dup') { const s = RD.Editor.cloneSkin(RD.skinById(id)); RD.setSkin(s.id); RD.UI.close(); RD.Editor.start(); return; }
+      if (a === 'del') { if (confirm('Delete this skin?')) { RD.userSkins = RD.userSkins.filter(s => s.id !== id); RD.saveUserSkins(); if (RD.settings.skin === id) RD.setSkin('neon'); RD.UI.skins(); } return; }
+      RD.setSkin(id); RD.UI.skins();
+      if (a === 'use') RD.UI.close();
+    }));
+    b.querySelector('#sk-imp').onclick = () => RD.UI.importFile();
+    b.querySelector('#sk-new').onclick = () => {
+      const s = RD.normSkin({ id: 'u' + RD.uid(), user: true, name: 'My Dashboard', font: 'sans', glow: false, bg: { type: 'grad', c1: '#111827', c2: '#000' }, pal: RD.clone(RD.BUILTIN[0].pal), screens: [{ name: 'Main', widgets: [] }] });
+      RD.userSkins.push(s); RD.saveUserSkins(); RD.setSkin(s.id); RD.UI.close(); RD.Editor.start();
+    };
+  },
+  thumbs(root) {
+    const cvs = root.querySelectorAll('.skin canvas'); let i = 0;
+    const next = () => {
+      if (i >= cvs.length) return; const cv = cvs[i++], s = RD.skinById(cv.parentElement.dataset.id);
+      RD.noCache = true; const sc = cv.width / RD.W;
+      try { RD.renderScreen(cv.getContext('2d'), s, 0, cv.width, cv.height, sc, 0, 0, null); } catch (e) {}
+      RD.noCache = false; setTimeout(next, 16);
+    };
+    next();
+  },
+  importFile() {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+    inp.onchange = () => { const f = inp.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => RD.UI.importText(r.result); r.readAsText(f); };
+    inp.click();
+  },
+  importText(txt) {
+    try {
+      const o = JSON.parse(txt);
+      if (o.kind === 'dashforge-backup') {
+        if (!confirm('Restore full backup? This replaces your custom skins, settings and trips.')) return;
+        RD.userSkins = (o.skins || []).map(RD.normSkin); RD.saveUserSkins();
+        if (o.settings) { RD.settings = Object.assign({}, RD.defaults, o.settings); RD.saveSettings(); }
+        if (o.trips) { RD.Trips.list = o.trips; RD.Trips.save(); }
+        RD.toast('Backup restored'); RD.setSkin(RD.settings.skin); RD.UI.close(); return;
+      }
+      const s = o.skin || o; if (!s.screens) throw new Error('Not a skin file');
+      s.id = 'u' + RD.uid(); s.user = true; RD.normSkin(s); RD.userSkins.push(s); RD.saveUserSkins(); RD.setSkin(s.id);
+      RD.toast('Imported "' + s.name + '"'); RD.UI.skins();
+    } catch (e) { RD.toast('Import failed: ' + e.message, 4000); }
+  },
+
+  /* ---------- connection ---------- */
+  conn() {
+    const s = RD.settings.source, o = RD.OBD;
+    const bt = !!navigator.bluetooth || !!RD.OBD.native();
+    const b = RD.UI.modal('Connection', `
+      <div class="srcs">
+        ${[['sim', '🎮', 'Demo / Simulator', 'Realistic simulated drive. Great for designing skins.'],
+          ['gps', '🛰️', 'GPS + Sensors', 'No adapter needed. Speed, trips, heading, altitude, G-force from the tablet.'],
+          ['obd', '🔌', 'OBD2 adapter (BLE)', 'RPM, temps, boost, fuel and fault codes via an ELM327 Bluetooth LE adapter. GPS used too.']]
+        .map(x => `<label class="src ${s === x[0] ? 'on' : ''}"><input type="radio" name="src" value="${x[0]}" ${s === x[0] ? 'checked' : ''}><span class="ic">${x[1]}</span><b>${x[2]}</b><small>${x[3]}</small></label>`).join('')}
+      </div>
+      <div id="obdbox" style="display:${s === 'obd' ? 'block' : 'none'}">
+        <div class="card">
+          <div class="row between"><div><b>Adapter:</b> <span id="obdst">${RD.status.obd}</span> ${o.rate ? '· ' + o.rate.toFixed(1) + ' PIDs/s' : ''}</div>
+          <button class="btn primary" id="obdc" ${bt ? '' : 'disabled'}>${RD.status.obd === 'live' ? 'Reconnect' : 'Connect OBD2 adapter'}</button></div>
+          ${bt ? '' : '<p class="warn">⚠ This browser has no Web Bluetooth. Use Chrome on Android, or install the native APK build (supports Classic Bluetooth + WiFi adapters too).</p>'}
+          <p class="hint">Plug the adapter into the OBD port, turn ignition ON, then tap Connect and pick your adapter (names like OBDII, Vgate, IOS-Vlink, OBDLink CX). Cheap "Bluetooth Classic" ELM327s will not appear here; they need the APK version.</p>
+          <details><summary>Connection log</summary><pre id="obdlog">${esc(o.log.join('\n'))}</pre></details>
+        </div>
+      </div>
+      <div class="card"><b>GPS:</b> ${RD.status.gps} ${RD.data.gpsAcc ? '· ±' + RD.data.gpsAcc.toFixed(0) + ' m' : ''} &nbsp; <b>Motion sensor:</b> ${RD.Motion.active ? 'on' : 'off'} <button class="btn sm" id="gcal">Zero G-sensor</button></div>`);
+    b.querySelectorAll('input[name=src]').forEach(r => r.onchange = () => { RD.setSource(r.value); RD.UI.conn(); });
+    const c = b.querySelector('#obdc'); if (c) c.onclick = async () => { c.disabled = true; c.textContent = 'Connecting…'; await RD.OBD.connect(); RD.UI.conn(); };
+    b.querySelector('#gcal').onclick = () => RD.Motion.calibrate();
+    RD.bus.on('obdlog', () => { const p = RD.$('#obdlog'); if (p) p.textContent = RD.OBD.log.join('\n'); const st = RD.$('#obdst'); if (st) st.textContent = RD.status.obd; });
+  },
+
+  /* ---------- trips ---------- */
+  trips() {
+    const T = RD.Trips, c = T.cur, u = RD.unitFor('tripDist');
+    const dur = (ms) => RD.fmtTime(ms / 1000);
+    const b = RD.UI.modal('Trips & GPS Log', `
+      <div class="card row between">
+        <div>${c ? `<b class="rec">● Recording</b> since ${new Date(c.start).toLocaleTimeString()} · ${RD.fmt('tripDist', c.dist)} ${u} · max ${RD.fmt('speed', c.max)} ${RD.unitFor('speed')}` : '<b>No trip recording</b>'}</div>
+        <button class="btn ${c ? 'danger' : 'primary'}" id="tr-ss">${c ? 'End trip' : 'Start trip'}</button>
+      </div>
+      <div class="row wrap">
+        <label class="chk"><input type="checkbox" id="tr-auto" ${RD.settings.autoTrip ? 'checked' : ''}> Auto start/end trips (starts after 15 s of driving, ends after 3 min parked)</label>
+        <label>Speed limit alert line <input type="number" id="tr-lim" value="${RD.settings.speedLimit}" style="width:80px"> ${RD.unitFor('speed')}</label>
+      </div>
+      <div class="trips">${T.list.length ? T.list.map(t => `
+        <div class="trip" data-id="${t.id}">
+          <div><b>${new Date(t.start).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</b> ${new Date(t.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → ${new Date(t.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+          <div class="stats"><span>${RD.fmt('tripDist', t.dist)} ${u}</span><span>${dur(t.end - t.start)}</span><span>avg ${RD.fmt('speed', t.avg)}</span><span>max ${RD.fmt('speed', t.max)}</span>${t.over ? `<span class="bad">${t.over}× over limit</span>` : ''}<span class="dim">${t.src === 'sim' ? 'demo' : t.src}</span></div>
+        </div>`).join('') : '<p class="hint">No trips yet. Drive with GPS or OBD2 connected and trips are logged automatically.</p>'}</div>
+      ${T.list.length ? '<div class="row"><button class="btn sm danger" id="tr-clear">Delete all trips</button></div>' : ''}`, { wide: true });
+    b.querySelector('#tr-ss').onclick = () => { c ? T.end('manual') : T.start(true); RD.UI.trips(); };
+    b.querySelector('#tr-auto').onchange = (e) => { RD.settings.autoTrip = e.target.checked; RD.saveSettings(); };
+    b.querySelector('#tr-lim').onchange = (e) => { RD.settings.speedLimit = +e.target.value; RD.saveSettings(); };
+    const clr = b.querySelector('#tr-clear'); if (clr) clr.onclick = () => { if (confirm('Delete all saved trips?')) { T.list = []; T.save(); RD.UI.trips(); } };
+    b.querySelectorAll('.trip').forEach(el => el.onclick = () => RD.UI.trip(el.dataset.id));
+  },
+  trip(id) {
+    const t = RD.Trips.list.find(x => x.id === id); if (!t) return;
+    const u = RD.unitFor('tripDist'), su = RD.unitFor('speed');
+    const b = RD.UI.modal('Trip — ' + new Date(t.start).toLocaleString(), `
+      <canvas id="route" width="900" height="420" class="route"></canvas>
+      <div class="kpis">
+        ${[['Distance', RD.fmt('tripDist', t.dist) + ' ' + u], ['Duration', RD.fmtTime((t.end - t.start) / 1000)], ['Moving', RD.fmtTime(t.moving)], ['Avg speed', RD.fmt('speed', t.avg) + ' ' + su],
+          ['Max speed', RD.fmt('speed', t.max) + ' ' + su], ['Over limit', t.over + '×'], ['Fuel (est.)', t.fuel ? t.fuel.toFixed(2) + ' L' : '—'], ['GPS points', t.pts.length]]
+        .map(k => `<div><small>${k[0]}</small><b>${k[1]}</b></div>`).join('')}
+      </div>
+      <canvas id="spdc" width="900" height="160" class="route"></canvas>
+      <div class="row"><button class="btn" id="t-gpx">Export GPX</button><button class="btn" id="t-maps">Open in Google Maps</button><button class="btn danger" id="t-del">Delete</button></div>`, { wide: true, back: () => RD.UI.trips() });
+    RD.drawRoute(b.querySelector('#route'), t);
+    const sc = b.querySelector('#spdc'), x = sc.getContext('2d'), W = sc.width, H = sc.height, sp = t.spd || [];
+    x.fillStyle = '#0d1420'; x.fillRect(0, 0, W, H);
+    if (sp.length > 1) {
+      const mxv = Math.max(60, ...sp); x.strokeStyle = '#4fc3ff'; x.lineWidth = 2; x.beginPath();
+      sp.forEach((v, i) => { const px = i / (sp.length - 1) * W, py = H - 10 - v / mxv * (H - 30); i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.stroke();
+      const lim = RD.settings.speedLimit / (RD.imp() ? 0.621371 : 1), ly = H - 10 - lim / mxv * (H - 30);
+      x.strokeStyle = '#ff3b5c'; x.setLineDash([6, 6]); x.beginPath(); x.moveTo(0, ly); x.lineTo(W, ly); x.stroke(); x.setLineDash([]);
+      x.fillStyle = '#8899aa'; x.font = '13px sans-serif'; x.fillText('Speed over time (' + su + ')  — red line = limit', 10, 16);
+    }
+    b.querySelector('#t-gpx').onclick = () => RD.download('trip-' + new Date(t.start).toISOString().slice(0, 16).replace(/:/g, '') + '.gpx', RD.Trips.gpx(t), 'application/gpx+xml');
+    b.querySelector('#t-maps').onclick = () => {
+      if (t.pts.length < 2) return RD.toast('Not enough GPS points');
+      const pick = [t.pts[0]].concat(t.pts.filter((_, i) => i % Math.ceil(t.pts.length / 8) === 0).slice(1, 9)).concat([t.pts[t.pts.length - 1]]);
+      window.open('https://www.google.com/maps/dir/' + pick.map(p => p[0] + ',' + p[1]).join('/'), '_blank');
+    };
+    b.querySelector('#t-del').onclick = () => { if (confirm('Delete this trip?')) { RD.Trips.remove(id); RD.UI.trips(); } };
+  },
+
+  /* ---------- performance ---------- */
+  perf() {
+    const P = RD.Perf;
+    const b = RD.UI.modal('Performance Timer', `
+      <div class="perfbig"><div id="pf-state"></div><div id="pf-time">0.00 s</div><div id="pf-spd"></div></div>
+      <div class="row center"><button class="btn primary big" id="pf-arm">Arm timer</button><button class="btn big" id="pf-cancel">Cancel</button></div>
+      <table class="res" id="pf-res"></table>
+      <h3>History</h3><div id="pf-hist" class="hint"></div>
+      <p class="hint">Uses GPS/OBD speed. GPS updates about once per second, so times are ±0.3 s. Only test on a closed track or safe empty road.</p>`, { onClose: () => clearInterval(RD._pfi) });
+    const upd = () => {
+      const st = { off: 'Ready', armed: RD.data.speed > 1 ? 'Armed — stop the vehicle' : 'Armed — GO when ready!', run: 'Running…', done: 'Finished' }[P.state];
+      b.querySelector('#pf-state').textContent = st;
+      b.querySelector('#pf-time').textContent = P.t.toFixed(2) + ' s';
+      b.querySelector('#pf-spd').textContent = RD.fmt('speed', RD.data.speed) + ' ' + RD.unitFor('speed') + ' · ' + (RD.imp() ? (P.dist * 3.28).toFixed(0) + ' ft' : P.dist.toFixed(0) + ' m');
+      const rows = P.targets().map(t => t.k).concat(['60 ft', '1/8 mile', '1/4 mile']);
+      b.querySelector('#pf-res').innerHTML = rows.map(k => `<tr><td>${k}</td><td>${P.res[k] ? P.res[k].toFixed(2) + ' s' : '—'}</td></tr>`).join('');
+      b.querySelector('#pf-hist').innerHTML = P.hist.length ? P.hist.slice(0, 8).map(h => `<div>${new Date(h.at).toLocaleString()} — ${Object.entries(h.res).map(([k, v]) => `<b>${k}</b> ${v.toFixed(2)}s`).join(' · ')}${h.src === 'sim' ? ' <i>(demo)</i>' : ''}</div>`).join('') : 'No runs yet';
+    };
+    b.querySelector('#pf-arm').onclick = () => { P.arm(); upd(); };
+    b.querySelector('#pf-cancel').onclick = () => { P.cancel(); upd(); };
+    upd(); clearInterval(RD._pfi); RD._pfi = setInterval(upd, 100);
+  },
+
+  /* ---------- fault codes ---------- */
+  DTC: { P0101: 'MAF sensor range/performance', P0113: 'Intake air temp sensor high', P0128: 'Coolant below thermostat temp', P0130: 'O2 sensor circuit (B1S1)', P0171: 'System too lean (Bank 1)', P0172: 'System too rich (Bank 1)',
+    P0300: 'Random/multiple cylinder misfire', P0301: 'Cylinder 1 misfire', P0302: 'Cylinder 2 misfire', P0303: 'Cylinder 3 misfire', P0304: 'Cylinder 4 misfire', P0335: 'Crankshaft position sensor A', P0340: 'Camshaft position sensor',
+    P0401: 'EGR flow insufficient', P0420: 'Catalyst efficiency below threshold (B1)', P0440: 'EVAP system malfunction', P0442: 'EVAP small leak', P0455: 'EVAP large leak', P0500: 'Vehicle speed sensor', P0505: 'Idle air control system',
+    P0562: 'System voltage low', P0700: 'Transmission control system', P0118: 'Coolant temp sensor high', P0117: 'Coolant temp sensor low', P0201: 'Injector circuit cyl 1', P0011: 'Camshaft timing over-advanced (B1)' },
+  dtc() {
+    const b = RD.UI.modal('Fault Codes (DTC)', `
+      <p class="hint">Reads stored and pending engine fault codes from the car via OBD2. Requires the OBD2 connection to be live.</p>
+      <div class="row"><button class="btn primary" id="d-read">Read codes</button><button class="btn danger" id="d-clr">Clear codes & check-engine light</button></div>
+      <div id="d-out" class="card">Status: ${RD.status.obd}</div>`);
+    const out = b.querySelector('#d-out');
+    b.querySelector('#d-read').onclick = async () => {
+      out.textContent = 'Reading…'; const r = await RD.OBD.readDTC();
+      if (r.err) { out.textContent = r.err; return; }
+      const li = (arr) => arr.length ? arr.map(c => `<div class="dtc"><b>${c}</b> ${esc(RD.UI.DTC[c] || 'See manufacturer documentation')} <a href="https://www.google.com/search?q=${c}+code" target="_blank">search ↗</a></div>`).join('') : '<div class="ok">None</div>';
+      out.innerHTML = `<h3>Stored</h3>${li(r.stored)}<h3>Pending</h3>${li(r.pending)}`;
+    };
+    b.querySelector('#d-clr').onclick = async () => {
+      if (!confirm('Clear all fault codes? This also resets emission readiness monitors. Engine should be OFF with ignition ON.')) return;
+      out.textContent = 'Clearing…'; const ok = await RD.OBD.clearDTC(); out.textContent = ok ? 'Codes cleared.' : 'Clear failed or not connected.';
+    };
+  },
+
+  /* ---------- alerts ---------- */
+  alerts() {
+    const A = RD.settings.alerts;
+    const row = (a, i) => `<div class="alert" data-i="${i}">
+      <input type="checkbox" data-k="on" ${a.on ? 'checked' : ''}>
+      <select data-k="src">${chOpts(a.src)}</select>
+      <select data-k="op"><option ${a.op === '>' ? 'selected' : ''}>&gt;</option><option ${a.op === '<' ? 'selected' : ''}>&lt;</option></select>
+      <input type="number" step="any" data-k="val" value="${a.val}" style="width:80px"><span class="dim">${RD.unitFor(a.src)}</span>
+      <input type="text" data-k="msg" value="${esc(a.msg)}" placeholder="Message">
+      <label class="chk"><input type="checkbox" data-k="beep" ${a.beep ? 'checked' : ''}>Beep</label>
+      <label class="chk"><input type="checkbox" data-k="speak" ${a.speak ? 'checked' : ''}>Voice</label>
+      <label class="chk"><input type="checkbox" data-k="flash" ${a.flash ? 'checked' : ''}>Flash</label>
+      <button class="btn sm" data-a="test">Test</button><button class="btn sm danger" data-a="del">✕</button></div>`;
+    const b = RD.UI.modal('Alerts (Trigger → Action)', `<p class="hint">Values are in your display units. Each alert fires once when crossing the threshold, then re-arms.</p>
+      <div id="al-list">${A.map(row).join('')}</div><div class="row"><button class="btn" id="al-add">+ Add alert</button><button class="btn ghost" id="al-reset">Restore defaults</button></div>`, { wide: true });
+    b.querySelectorAll('.alert').forEach(el => {
+      const i = +el.dataset.i;
+      el.querySelectorAll('[data-k]').forEach(inp => inp.onchange = () => {
+        const k = inp.dataset.k; A[i][k] = inp.type === 'checkbox' ? inp.checked : inp.type === 'number' ? +inp.value : inp.value; RD.saveSettings();
+        if (k === 'src') RD.UI.alerts();
+      });
+      el.querySelector('[data-a=test]').onclick = () => { RD.beep(880, 2); RD.speak(A[i].msg); };
+      el.querySelector('[data-a=del]').onclick = () => { A.splice(i, 1); RD.saveSettings(); RD.UI.alerts(); };
+    });
+    b.querySelector('#al-add').onclick = () => { A.push({ on: true, src: 'speed', op: '>', val: 100, msg: 'Alert', beep: true, speak: false, flash: true }); RD.saveSettings(); RD.UI.alerts(); };
+    b.querySelector('#al-reset').onclick = () => { RD.settings.alerts = RD.clone(RD.defaults.alerts); RD.saveSettings(); RD.UI.alerts(); };
+  },
+
+  /* ---------- settings ---------- */
+  settings() {
+    const S = RD.settings;
+    const sel = (k, opts) => `<select data-k="${k}">${opts.map(o => { const [v, l] = Array.isArray(o) ? o : [o, o]; return `<option value="${v}" ${String(S[k]) === String(v) ? 'selected' : ''}>${l}</option>`; }).join('')}</select>`;
+    const num = (k, step) => `<input type="number" data-k="${k}" value="${S[k]}" step="${step || 'any'}">`;
+    const chk = (k) => `<input type="checkbox" data-k="${k}" ${S[k] ? 'checked' : ''}>`;
+    const b = RD.UI.modal('Settings', `<div class="form">
+      <h3>Units</h3>
+      <label>Units ${sel('units', [['metric', 'Metric (km/h, °C)'], ['imperial', 'Imperial (mph, °F)']])}</label>
+      <label>Boost pressure ${sel('pressure', ['bar', 'psi', 'kPa'])}</label>
+      <h3>Car</h3>
+      <label>Redline RPM ${num('redline', 100)}</label>
+      <label>Gear ratios (km/h per 1000 rpm, gear 1→6) <input type="text" data-k="ratios" value="${esc(S.ratios)}"></label>
+      <label>Fuel tank (L) ${num('tank', 1)}</label>
+      <label>Fuel price per litre (₹) ${num('fuelPrice', 0.5)}</label>
+      <label>Tablet mounting ${sel('mount', [['upright', 'Upright (screen facing driver)'], ['flat', 'Lying flat']])}</label>
+      <h3>Display</h3>
+      <label>Brightness ${'<input type="range" min="0.3" max="1" step="0.05" data-k="brightness" value="' + S.brightness + '">'}</label>
+      <label>Auto night mode (7pm–6am) ${chk('autoNight')}</label>
+      <label>Keep screen awake ${chk('wake')}</label>
+      <label>Graphics quality ${sel('quality', [['auto', 'Auto (recommended)'], ['high', 'High (glow effects)'], ['low', 'Low (old devices)']])}</label>
+      <label>Max frame rate ${sel('maxFps', [[60, '60'], [30, '30 (saves battery)'], [20, '20']])}</label>
+      <label>Show FPS counter ${chk('fps')}</label>
+      <h3>Sound</h3>
+      <label>Voice alerts ${chk('voice')}</label>
+      <label>Volume ${'<input type="range" min="0" max="1" step="0.05" data-k="volume" value="' + S.volume + '">'}</label>
+      <label>Allow video while moving (passenger use) ${chk('videoMoving')}</label>
+      <h3>OBD2 polling (advanced)</h3>
+      <label>Fast PIDs <input type="text" data-k="obdFast" value="${esc(S.obdFast)}"></label>
+      <label>Slow PIDs <input type="text" data-k="obdSlow" value="${esc(S.obdSlow)}"></label>
+      <div class="row"><button class="btn danger" id="st-reset">Reset all settings</button></div></div>`);
+    b.querySelectorAll('[data-k]').forEach(inp => inp.onchange = inp.oninput = () => {
+      const k = inp.dataset.k; let v = inp.type === 'checkbox' ? inp.checked : (inp.type === 'number' || inp.type === 'range') ? +inp.value : inp.value;
+      if (k === 'maxFps') v = +v;
+      S[k] = v; RD.saveSettings();
+      if (k === 'quality') { RD.lowPerf = false; RD.hq = v !== 'low'; RD.layout(); }
+      if (k === 'units' || k === 'pressure') RD.faceCache.clear();
+      RD.updateHud();
+    });
+    b.querySelector('#st-reset').onclick = () => { if (confirm('Reset all settings to defaults?')) { const sk = S.skin; RD.settings = Object.assign({}, RD.defaults, { skin: sk }); RD.settings.alerts = RD.clone(RD.defaults.alerts); RD.saveSettings(); RD.layout(); RD.UI.settings(); } };
+  },
+
+  /* ---------- device compatibility check ---------- */
+  device() {
+    const ua = navigator.userAgent, and = (ua.match(/Android\s([\d.]+)/) || [])[1], chrome = (ua.match(/Chrome\/([\d.]+)/) || [])[1];
+    const checks = [
+      ['Android version', and || 'not Android', and ? (parseFloat(and) >= 7 ? 'ok' : 'warn') : 'info'],
+      ['Browser engine', chrome ? 'Chrome ' + chrome.split('.')[0] : 'Other', chrome && parseInt(chrome) >= 80 ? 'ok' : 'warn'],
+      ['Screen', screen.width + '×' + screen.height + ' @' + (window.devicePixelRatio || 1) + 'x', 'ok'],
+      ['CPU cores / RAM', (navigator.hardwareConcurrency || '?') + ' cores / ' + (navigator.deviceMemory ? navigator.deviceMemory + ' GB' : '?'), (navigator.hardwareConcurrency || 4) >= 4 ? 'ok' : 'warn'],
+      ['Current FPS', RD.fps.toFixed(0) + ' fps (' + RD._slow.toFixed(1) + ' ms/frame)', RD.fps >= 40 ? 'ok' : RD.fps >= 24 ? 'warn' : 'bad'],
+      ['Web Bluetooth (BLE OBD2)', navigator.bluetooth ? 'available' : 'not available', navigator.bluetooth ? 'ok' : 'warn'],
+      ['GPS / Geolocation', navigator.geolocation ? 'available' + (location.protocol === 'https:' ? '' : ' (needs https)') : 'missing', navigator.geolocation ? 'ok' : 'bad'],
+      ['Motion sensors', 'DeviceMotionEvent' in window ? (RD.Motion.raw[0] || RD.Motion.raw[1] ? 'receiving data' : 'supported (move tablet to test)') : 'missing', 'DeviceMotionEvent' in window ? 'ok' : 'warn'],
+      ['Keep screen awake', 'wakeLock' in navigator ? 'supported' : 'not supported — set screen timeout to max in Android settings', 'wakeLock' in navigator ? 'ok' : 'warn'],
+      ['Fullscreen', document.fullscreenEnabled ? 'supported' : 'limited', document.fullscreenEnabled ? 'ok' : 'warn'],
+      ['Voice alerts', 'speechSynthesis' in window ? 'supported' : 'not supported', 'speechSynthesis' in window ? 'ok' : 'warn'],
+      ['Online', navigator.onLine ? 'yes' : 'offline', 'info']
+    ];
+    const rep = checks.map(c => c[0] + ': ' + c[1]).join('\n') + '\nUA: ' + ua;
+    let framed = false; try { framed = window.top !== window; } catch (e) { framed = true; }
+    const b = RD.UI.modal('Device Check', `${framed ? '<p class="warn card">⚠ Running inside the Claude preview frame: GPS, motion sensors, Bluetooth, YouTube and downloads are blocked here by the frame. They work in the installed tablet version.</p>' : ''}<table class="res chk">${checks.map(c => `<tr><td>${c[0]}</td><td class="${c[2]}">${esc(c[1])}</td></tr>`).join('')}</table>
+      <p class="hint">Verdict: ${and && parseFloat(and) < 7 ? '⚠ Android below 7 — the web version may struggle; the native APK targets Android 7+.' : 'This device can run DashForge. ' + (navigator.bluetooth ? 'BLE OBD2 works here.' : 'For OBD2, use the APK build.')}</p>
+      <div class="row"><button class="btn primary" id="dv-copy">Copy report</button><button class="btn" id="dv-gps">Test GPS</button><button class="btn" id="dv-motion">Test motion sensor</button></div>
+      <textarea readonly class="rep">${esc(rep)}</textarea>`);
+    b.querySelector('#dv-copy').onclick = () => { const ta = b.querySelector('.rep'); ta.select(); try { navigator.clipboard.writeText(rep); } catch (e) { document.execCommand('copy'); } RD.toast('Report copied — paste it to Claude'); };
+    b.querySelector('#dv-gps').onclick = () => { RD.GPS.start(); RD.toast('GPS started — allow location permission'); };
+    b.querySelector('#dv-motion').onclick = async () => { await RD.Motion.start(); setTimeout(() => RD.UI.device(), 1500); };
+  },
+
+  /* ---------- backup / share ---------- */
+  io() {
+    const s = RD.skin();
+    const b = RD.UI.modal('Backup & Share', `
+      <div class="card"><b>Current skin: ${esc(s.name)}</b><div class="row"><button class="btn" id="io-skin">Download skin file</button><button class="btn" id="io-copy">Copy skin JSON</button></div></div>
+      <div class="card"><b>Import a skin</b><div class="row"><button class="btn" id="io-file">From file…</button></div>
+      <textarea id="io-paste" placeholder="…or paste skin JSON here"></textarea><button class="btn sm" id="io-pastebtn">Import pasted JSON</button></div>
+      <div class="card"><b>Full backup</b> (custom skins, settings, alerts, trips)<div class="row"><button class="btn primary" id="io-backup">Download backup</button><button class="btn" id="io-restore">Restore backup…</button></div></div>`);
+    const skinJson = () => { const c = RD.clone(s); delete c.id; c.screens.forEach(sc => sc.widgets.forEach(w => { delete w._v; delete w.id; })); return JSON.stringify({ kind: 'dashforge-skin', v: 1, skin: c }, null, 1); };
+    b.querySelector('#io-skin').onclick = () => RD.download(s.name.replace(/\W+/g, '-').toLowerCase() + '.dashskin.json', skinJson());
+    b.querySelector('#io-copy').onclick = () => { try { navigator.clipboard.writeText(skinJson()); RD.toast('Copied'); } catch (e) { RD.toast('Copy failed'); } };
+    b.querySelector('#io-file').onclick = () => RD.UI.importFile();
+    b.querySelector('#io-restore').onclick = () => RD.UI.importFile();
+    b.querySelector('#io-pastebtn').onclick = () => RD.UI.importText(b.querySelector('#io-paste').value);
+    b.querySelector('#io-backup').onclick = () => RD.download('dashforge-backup-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify({ kind: 'dashforge-backup', v: 1, at: Date.now(), skins: RD.userSkins, settings: RD.settings, trips: RD.Trips.list }));
+  }
+};
+
+/* ===== MEDIA DOCK: YouTube + app launcher ===== */
+RD.Media = {
+  isOpen: false,
+  APPS: [
+    ['YouTube', '#ff0000', '▶', 'com.google.android.youtube'], ['YT Music', '#ff0033', '♫', 'com.google.android.apps.youtube.music'], ['Spotify', '#1db954', '◉', 'com.spotify.music'],
+    ['JioSaavn', '#2bc5b4', '♪', 'com.jio.media.jiobeats'], ['Google Maps', '#34a853', '➤', 'com.google.android.apps.maps'], ['Waze', '#33ccff', '☺', 'com.waze'],
+    ['WhatsApp', '#25d366', '✆', 'com.whatsapp'], ['Phone', '#4f8cff', '☎', 'tel:'], ['Android Auto', '#3ddc84', 'A', 'com.google.android.projection.gearhead']
+  ],
+  init() {
+    this.favs = RD.store.get('ytfavs', [{ t: 'Lo-fi drive mix', id: 'jfKfPfyJRdk', live: true }]);
+    this.custom = RD.store.get('apps', []);
+    this.render();
+  },
+  render() {
+    const d = RD.$('#dock'); const apps = this.APPS.concat(this.custom.map(c => [c.n, '#666', c.n[0], c.p]));
+    d.innerHTML = `<div class="dock-h"><b>Media & Apps</b><button class="x" id="dk-x">✕</button></div>
+      <div class="yt"><div id="ytwrap" class="ytwrap"><div class="ytph">Paste a YouTube link below or pick a favourite</div></div>
+      <div class="parked" id="parked">🚗 Video hidden while driving — audio keeps playing</div></div>
+      <div class="row"><input id="yt-url" placeholder="YouTube link or video ID"><button class="btn sm primary" id="yt-play">Play</button><button class="btn sm" id="yt-fav">★</button></div>
+      <div class="favs">${this.favs.map((f, i) => `<span class="fav" data-i="${i}">${esc(f.t)}<i data-d="${i}">✕</i></span>`).join('')}</div>
+      <div class="apps">${apps.map(a => `<button class="app" data-p="${esc(a[3])}"><span style="background:${a[1]}">${esc(a[2])}</span>${esc(a[0])}</button>`).join('')}
+      <button class="app" id="app-add"><span style="background:#333">+</span>Add app</button></div>
+      <div class="row"><input id="nav-to" placeholder="Navigate to… (address or place)"><button class="btn sm primary" id="nav-go">Go</button></div>`;
+    d.querySelector('#dk-x').onclick = () => this.close();
+    d.querySelector('#yt-play').onclick = () => this.play(d.querySelector('#yt-url').value);
+    d.querySelector('#yt-fav').onclick = () => {
+      const id = this.parse(d.querySelector('#yt-url').value) || this.cur; if (!id) return RD.toast('Paste a link first');
+      const t = prompt('Name for this favourite?', 'My video'); if (!t) return; this.favs.push(Object.assign({ t }, id)); RD.store.set('ytfavs', this.favs); this.render();
+    };
+    d.querySelectorAll('.fav').forEach(f => f.onclick = (e) => {
+      if (e.target.dataset.d != null) { this.favs.splice(+e.target.dataset.d, 1); RD.store.set('ytfavs', this.favs); this.render(); return; }
+      const v = this.favs[+f.dataset.i]; this.playId(v);
+    });
+    d.querySelectorAll('.app[data-p]').forEach(b => b.onclick = () => this.launch(b.dataset.p));
+    d.querySelector('#app-add').onclick = () => {
+      const n = prompt('App name (e.g. Gaana)'); if (!n) return; const p = prompt('Android package name (e.g. com.gaana). Find it in the Play Store URL after id='); if (!p) return;
+      this.custom.push({ n, p }); RD.store.set('apps', this.custom); this.render();
+    };
+    d.querySelector('#nav-go').onclick = () => { const q = d.querySelector('#nav-to').value.trim(); if (q) window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(q) + '&travelmode=driving', '_blank'); };
+    if (this.cur) this.playId(this.cur, true);
+  },
+  parse(s) {
+    s = (s || '').trim(); if (!s) return null; let m;
+    if ((m = /[?&]list=([\w-]+)/.exec(s))) return { list: m[1], id: (/[?&]v=([\w-]{11})/.exec(s) || [])[1] };
+    if ((m = /(?:youtu\.be\/|v=|embed\/|shorts\/|live\/)([\w-]{11})/.exec(s))) return { id: m[1] };
+    if (/^[\w-]{11}$/.test(s)) return { id: s };
+    return null;
+  },
+  play(s) { const p = this.parse(s); if (!p) return RD.toast('Could not read that YouTube link'); this.playId(p); },
+  playId(p, quiet) {
+    this.cur = p; const w = RD.$('#ytwrap'); if (!w) return;
+    const q = 'autoplay=' + (quiet ? 0 : 1) + '&playsinline=1&rel=0&modestbranding=1' + (p.list ? '&list=' + p.list : '');
+    const src = 'https://www.youtube.com/embed/' + (p.id || 'videoseries') + '?' + q;
+    w.innerHTML = `<iframe src="${src}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+  },
+  launch(p) {
+    if (p.startsWith('tel:')) { location.href = 'tel:'; return; }
+    const ua = navigator.userAgent;
+    try { const AL = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppLauncher; if (AL && window.Capacitor.isNativePlatform()) { AL.openUrl({ url: p }).catch(() => RD.toast('App not installed')); return; } } catch (e) {}
+    if (!/Android/i.test(ua)) { RD.toast('App launching works on the Android tablet'); return; }
+    location.href = 'intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=' + p + ';end';
+  },
+  guard() {
+    const pk = RD.$('#parked'); if (!pk) return;
+    const moving = RD.data.speed > 8 && RD.settings.source !== 'sim' && !RD.settings.videoMoving;
+    pk.classList.toggle('show', !!(moving && this.cur));
+  },
+  open() { this.isOpen = true; document.body.classList.add('dock-on'); setTimeout(RD.layout, 260); },
+  close() { this.isOpen = false; document.body.classList.remove('dock-on'); setTimeout(RD.layout, 260); },
+  toggle() { this.isOpen ? this.close() : this.open(); }
+};
+
+/* ===== DASHBOARD EDITOR: drag, resize, properties, screens, skin styling, undo ===== */
+'use strict';
+RD.Editor = {
+  sel: null, drag: null, undo: [], grid: 10, snap: true,
+  cloneSkin(src) {
+    const s = RD.clone(src); s.id = 'u' + RD.uid(); s.user = true; s.name = (src.user ? src.name + ' copy' : 'My ' + src.name);
+    s.screens.forEach(sc => sc.widgets.forEach(w => { w.id = RD.uid(); w._v = 0; }));
+    RD.normSkin(s); RD.userSkins.push(s); RD.saveUserSkins(); return s;
+  },
+  start() {
+    let s = RD.skin();
+    if (!s.user) { s = this.cloneSkin(s); RD.setSkin(s.id); RD.toast('Editing your own copy: "' + s.name + '"', 3500); }
+    RD.editing = true; document.body.classList.add('editing', 'hud-on'); this.sel = null; this.undo = [];
+    this.bar(); this.panel(); setTimeout(RD.layout, 60);
+  },
+  stop() {
+    RD.editing = false; document.body.classList.remove('editing'); this.sel = null;
+    RD.$('#edbar').innerHTML = ''; RD.$('#edpanel').innerHTML = ''; RD.saveUserSkins(); RD.toast('Saved'); RD.showHud(); setTimeout(RD.layout, 60);
+  },
+  screen() { return RD.skin().screens[RD.settings.screen]; },
+  snapshot() { this.undo.push(JSON.stringify(RD.skin())); if (this.undo.length > 40) this.undo.shift(); },
+  doUndo() {
+    const j = this.undo.pop(); if (!j) return RD.toast('Nothing to undo');
+    const s = JSON.parse(j), cur = RD.skin(); Object.keys(cur).forEach(k => delete cur[k]); Object.assign(cur, s);
+    cur.screens.forEach(sc => sc.widgets.forEach(w => w._v = (w._v || 0) + 1)); this.sel = null; RD.faceCache.clear(); RD.bgCache.k = ''; this.panel(); RD.updateDots();
+  },
+  changed(w) { if (w) w._v = (w._v || 0) + 1; clearTimeout(this._st); this._st = setTimeout(() => RD.saveUserSkins(), 600); },
+  toV(e) { const r = RD.view.rect || RD.$('#stage').getBoundingClientRect(), v = RD.view; return [(e.clientX - r.left - v.ox) / v.s, (e.clientY - r.top - v.oy) / v.s]; },
+  hit(x, y) { const ws = this.screen().widgets; for (let i = ws.length - 1; i >= 0; i--) { const w = ws[i]; if (x >= w.x && x <= w.x + w.w && y >= w.y && y <= w.y + w.h) return w; } return null; },
+  down(e) {
+    const [x, y] = this.toV(e), s = this.sel, hs = 22 / RD.view.s * 0.8 + 8;
+    if (s && Math.abs(x - (s.x + s.w)) < hs && Math.abs(y - (s.y + s.h)) < hs) { this.snapshot(); this.drag = { mode: 'resize', w: s, x0: x, y0: y, ow: s.w, oh: s.h }; return; }
+    const w = this.hit(x, y);
+    if (w !== this.sel) { this.sel = w; this.panel(); }
+    if (w) { this.snapshot(); this.drag = { mode: 'move', w, x0: x, y0: y, ox: w.x, oy: w.y, moved: false }; }
+  },
+  move(e) {
+    const d = this.drag; if (!d) return; const [x, y] = this.toV(e), g = this.snap ? this.grid : 1, sn = (v) => Math.round(v / g) * g;
+    if (d.mode === 'move') { d.w.x = sn(d.ox + x - d.x0); d.w.y = sn(d.oy + y - d.y0); d.moved = true; }
+    else { d.w.w = Math.max(20, sn(d.ow + x - d.x0)); d.w.h = Math.max(12, sn(d.oh + y - d.y0)); if (e.shiftKey && d.w.type === 'radial') d.w.h = d.w.w; }
+    this.changed(d.w); this.posFields();
+  },
+  up() { if (this.drag) { if (this.drag.mode === 'move' && !this.drag.moved) this.undo.pop(); this.drag = null; this.changed(); } },
+  key(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    const w = this.sel, st = e.shiftKey ? 10 : 1;
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); return this.doUndo(); }
+    if (!w) return;
+    const mv = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st] }[e.key];
+    if (mv) { e.preventDefault(); w.x += mv[0]; w.y += mv[1]; this.changed(w); this.posFields(); }
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.del(); }
+  },
+  overlay(ctx) {
+    const v = RD.view, d = RD.dpr; ctx.setTransform(v.s * d, 0, 0, v.s * d, v.ox * d, v.oy * d);
+    if (this.snap) { ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let x = 0; x <= RD.W; x += 40) for (let y = 0; y <= RD.H; y += 40) ctx.fillRect(x - 1, y - 1, 2, 2); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1 / v.s;
+    this.screen().widgets.forEach(w => ctx.strokeRect(w.x, w.y, w.w, w.h)); ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.strokeRect(0, 0, RD.W, RD.H);
+    const s = this.sel; if (!s) return;
+    ctx.strokeStyle = '#3d9bff'; ctx.lineWidth = 2.5 / v.s; ctx.strokeRect(s.x, s.y, s.w, s.h);
+    const hs = 22 / v.s * 0.8; ctx.fillStyle = '#3d9bff'; ctx.fillRect(s.x + s.w - hs / 2, s.y + s.h - hs / 2, hs, hs);
+    ctx.fillStyle = '#fff'; ctx.font = (12 / v.s) + 'px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText(RD.WT[s.type].name + '  ' + Math.round(s.x) + ',' + Math.round(s.y) + '  ' + Math.round(s.w) + '×' + Math.round(s.h), s.x, s.y - 3 / v.s);
+  },
+  add(type) {
+    const t = RD.WT[type]; this.snapshot();
+    const w = Object.assign({ type, id: RD.uid(), _v: 0 }, RD.clone(t.def)); w.x = Math.round((RD.W - w.w) / 2 / 10) * 10; w.y = Math.round((RD.H - w.h) / 2 / 10) * 10;
+    this.screen().widgets.push(w); this.sel = w; this.changed(w); this.panel();
+  },
+  del() { const w = this.sel; if (!w) return; this.snapshot(); const ws = this.screen().widgets; ws.splice(ws.indexOf(w), 1); this.sel = null; this.changed(); this.panel(); },
+  dup() { const w = this.sel; if (!w) return; this.snapshot(); const c = RD.clone(w); c.id = RD.uid(); c.x += 20; c.y += 20; this.screen().widgets.push(c); this.sel = c; this.changed(c); this.panel(); },
+  order(dir) { const w = this.sel; if (!w) return; this.snapshot(); const ws = this.screen().widgets, i = ws.indexOf(w); ws.splice(i, 1); if (dir > 0) ws.push(w); else ws.unshift(w); this.changed(); },
+  bar() {
+    const types = Object.keys(RD.WT);
+    RD.$('#edbar').innerHTML = `
+      <select id="ed-add"><option value="">＋ Add widget</option>${types.map(t => `<option value="${t}">${RD.WT[t].name}</option>`).join('')}</select>
+      <button class="btn sm" id="ed-dup" title="Duplicate">⧉</button><button class="btn sm" id="ed-del" title="Delete">🗑</button>
+      <button class="btn sm" id="ed-front" title="Bring to front">⬆</button><button class="btn sm" id="ed-back" title="Send to back">⬇</button>
+      <button class="btn sm" id="ed-undo" title="Undo">↶</button><button class="btn sm ${this.snap ? 'on' : ''}" id="ed-grid" title="Snap to grid">#</button>
+      <select id="ed-scr">${RD.skin().screens.map((s, i) => `<option value="${i}" ${i === RD.settings.screen ? 'selected' : ''}>${RD.esc(s.name)}</option>`).join('')}<option value="+">＋ New screen</option><option value="ren">Rename screen…</option><option value="dupS">Duplicate screen</option><option value="delS">Delete screen</option></select>
+      <button class="btn sm" id="ed-skin">🎨 Skin style</button><button class="btn sm primary" id="ed-done">✓ Done</button>`;
+    const $ = (id) => RD.$('#' + id);
+    $('ed-add').onchange = (e) => { if (e.target.value) this.add(e.target.value); e.target.value = ''; };
+    $('ed-dup').onclick = () => this.dup(); $('ed-del').onclick = () => this.del(); $('ed-front').onclick = () => this.order(1); $('ed-back').onclick = () => this.order(-1);
+    $('ed-undo').onclick = () => this.doUndo(); $('ed-grid').onclick = () => { this.snap = !this.snap; this.bar(); };
+    $('ed-done').onclick = () => this.stop(); $('ed-skin').onclick = () => { this.sel = null; this.panel(true); };
+    $('ed-scr').onchange = (e) => {
+      const v = e.target.value, sk = RD.skin();
+      if (v === '+') { this.snapshot(); sk.screens.push({ name: 'Screen ' + (sk.screens.length + 1), widgets: [] }); RD.setScreen(sk.screens.length - 1); }
+      else if (v === 'ren') { const n = prompt('Screen name', this.screen().name); if (n) this.screen().name = n; }
+      else if (v === 'dupS') { this.snapshot(); const c = RD.clone(this.screen()); c.name += ' copy'; c.widgets.forEach(w => w.id = RD.uid()); sk.screens.splice(RD.settings.screen + 1, 0, c); RD.setScreen(RD.settings.screen + 1); }
+      else if (v === 'delS') { if (sk.screens.length < 2) RD.toast('A skin needs at least one screen'); else if (confirm('Delete screen "' + this.screen().name + '"?')) { this.snapshot(); sk.screens.splice(RD.settings.screen, 1); RD.setScreen(0); } }
+      else RD.setScreen(+v);
+      this.sel = null; this.changed(); this.bar(); this.panel();
+    };
+  },
+  colorField(k, val, label) {
+    const refs = ['@primary', '@accent', '@warn', '@text', '@dim', '@track', '@panel', '@line', '@face', '@ring'];
+    const isRef = val && val[0] === '@', isNone = !val || val === 'none';
+    const hex = !isRef && !isNone && /^#[0-9a-f]{6}$/i.test(val) ? val : RD.toHex(RD.col(isRef ? val : (isNone ? '#000000' : val), RD.skin()));
+    return `<label class="cf">${label}<span><select data-c="${k}">${refs.map(r => `<option value="${r}" ${val === r ? 'selected' : ''}>${r.slice(1)}</option>`).join('')}<option value="none" ${isNone ? 'selected' : ''}>none</option><option value="custom" ${!isRef && !isNone ? 'selected' : ''}>custom</option></select>
+      <input type="color" data-cc="${k}" value="${hex}" ${isRef || isNone ? 'style="opacity:.35"' : ''}></span></label>`;
+  },
+  posFields() {
+    const w = this.sel; if (!w) return;
+    ['x', 'y', 'w', 'h'].forEach(k => { const i = RD.$('#edpanel [data-p="' + k + '"]'); if (i && document.activeElement !== i) i.value = Math.round(w[k]); });
+  },
+  panel(skinMode) {
+    const p = RD.$('#edpanel'), w = this.sel, sk = RD.skin();
+    if (!w && !skinMode) { p.innerHTML = `<div class="edhint"><b>Editing: ${RD.esc(sk.name)}</b><p>Tap a widget to select it. Drag to move, drag the blue corner to resize. Arrow keys nudge.</p><p>Use <b>＋ Add widget</b> to add gauges, bars, readouts, graphs, images, clocks and more.</p><p>Swipe screens with the screen selector. Changes save automatically.</p></div>`; return; }
+    if (skinMode) {
+      const pal = sk.pal;
+      p.innerHTML = `<h3>Skin style</h3>
+        <label>Name <input type="text" data-s="name" value="${RD.esc(sk.name)}"></label>
+        <label>Default font <select data-s="font">${Object.keys(RD.FONTS).map(f => `<option ${sk.font === f ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
+        <label class="chk"><input type="checkbox" data-s="glow" ${sk.glow ? 'checked' : ''}> Glow effects</label>
+        <label>Background <select data-b="type">${['solid', 'grad', 'radial', 'grid', 'carbon', 'synth'].map(t => `<option ${sk.bg.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <label class="cf">Background 1 <input type="color" data-b="c1" value="${RD.toHex(sk.bg.c1)}"></label>
+        <label class="cf">Background 2 <input type="color" data-b="c2" value="${RD.toHex(sk.bg.c2 || sk.bg.c1)}"></label>
+        <h3>Palette</h3><p class="hint">Widgets using palette colours update together.</p>
+        ${Object.keys(pal).filter(k => k !== 'ghost').map(k => `<label class="cf">${k}<input type="color" data-pal="${k}" value="${RD.toHex(pal[k])}"></label>`).join('')}
+        <h3>Quick themes</h3><div class="swatches">${RD.BUILTIN.map(b => `<button class="sw" data-th="${b.id}" title="${RD.esc(b.name)}" style="background:linear-gradient(135deg,${b.pal.primary} 0 50%,${b.pal.accent} 50%)"></button>`).join('')}</div>`;
+      p.querySelectorAll('[data-s]').forEach(i => i.onchange = () => { this.snapshot(); sk[i.dataset.s] = i.type === 'checkbox' ? i.checked : i.value; RD.faceCache.clear(); this.changed(); });
+      p.querySelectorAll('[data-b]').forEach(i => i.oninput = () => { sk.bg[i.dataset.b] = i.value; RD.bgCache.k = ''; this.changed(); });
+      p.querySelectorAll('[data-pal]').forEach(i => i.oninput = () => { sk.pal[i.dataset.pal] = i.value; RD.faceCache.clear(); RD._shadeC = {}; this.changed(); });
+      p.querySelectorAll('[data-th]').forEach(b => b.onclick = () => { this.snapshot(); const t = RD.skinById(b.dataset.th); sk.pal = RD.clone(t.pal); sk.bg = RD.clone(t.bg); sk.font = t.font; sk.glow = t.glow; RD.faceCache.clear(); RD.bgCache.k = ''; this.changed(); this.panel(true); });
+      return;
+    }
+    const t = RD.WT[w.type];
+    const field = (pr) => {
+      const v = w[pr.k];
+      switch (pr.type) {
+        case 'ch': return `<label>${pr.label}<select data-k="${pr.k}">${RD.chList().map(c => `<option value="${c}" ${c === v ? 'selected' : ''}>${RD.esc(RD.CH[c].label)}</option>`).join('')}</select></label>`;
+        case 'num': return `<label>${pr.label}<input type="number" step="any" data-k="${pr.k}" value="${v == null ? '' : v}"></label>`;
+        case 'text': return `<label>${pr.label}<input type="text" data-k="${pr.k}" value="${RD.esc(v)}"></label>`;
+        case 'bool': return `<label class="chk"><input type="checkbox" data-k="${pr.k}" ${v ? 'checked' : ''}> ${pr.label}</label>`;
+        case 'sel': return `<label>${pr.label}<select data-k="${pr.k}">${pr.opts.map(o => `<option ${String(o) === String(v) ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+        case 'font': return `<label>${pr.label}<select data-k="${pr.k}"><option value="@" ${v === '@' ? 'selected' : ''}>skin default</option>${Object.keys(RD.FONTS).map(f => `<option ${v === f ? 'selected' : ''}>${f}</option>`).join('')}</select></label>`;
+        case 'color': return this.colorField(pr.k, v, pr.label);
+        case 'image': return `<label>${pr.label}<input type="file" accept="image/*" data-img="${pr.k}"></label>${v ? '<button class="btn sm" data-clrimg="' + pr.k + '">Remove image</button>' : ''}`;
+      }
+      return '';
+    };
+    p.innerHTML = `<h3>${t.name}</h3><div class="pos">${['x', 'y', 'w', 'h'].map(k => `<label>${k.toUpperCase()}<input type="number" data-p="${k}" value="${Math.round(w[k])}"></label>`).join('')}</div>
+      ${t.props.map(field).join('')}<div class="row"><button class="btn sm" id="ep-dup">Duplicate</button><button class="btn sm danger" id="ep-del">Delete</button></div>`;
+    const set = (k, val) => { this.snapshot(); w[k] = val; if (k === 'src') { const c = RD.CH[val]; if (c && 'min' in w) { w.min = c.min; w.max = c.max; } if (w.type === 'radial') { w.numDiv = val === 'rpm' ? 1000 : 1; w.label = val === 'rpm' ? 'RPM' : (c.label || '').toUpperCase(); w.sub = val === 'rpm' ? 'x1000' : ''; w.red = val === 'rpm' ? RD.settings.redline : ''; } this.panel(); } this.changed(w); };
+    p.querySelectorAll('[data-p]').forEach(i => i.onchange = () => { this.snapshot(); w[i.dataset.p] = +i.value; this.changed(w); });
+    p.querySelectorAll('[data-k]').forEach(i => i.onchange = () => {
+      const pr = t.props.find(x => x.k === i.dataset.k);
+      set(i.dataset.k, i.type === 'checkbox' ? i.checked : pr.type === 'num' ? (i.value === '' ? '' : +i.value) : i.value);
+    });
+    p.querySelectorAll('[data-c]').forEach(s => s.onchange = () => {
+      const k = s.dataset.c, cc = p.querySelector('[data-cc="' + k + '"]');
+      if (s.value === 'custom') { cc.style.opacity = 1; set(k, cc.value); } else { cc.style.opacity = .35; set(k, s.value); }
+    });
+    p.querySelectorAll('[data-cc]').forEach(c => c.oninput = () => { const k = c.dataset.cc; p.querySelector('[data-c="' + k + '"]').value = 'custom'; c.style.opacity = 1; w[k] = c.value; this.changed(w); });
+    p.querySelectorAll('[data-img]').forEach(f => f.onchange = () => {
+      const file = f.files[0]; if (!file) return; const r = new FileReader();
+      r.onload = () => { const im = new Image(); im.onload = () => { const m = 640, s = Math.min(1, m / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = im.width * s; c.height = im.height * s; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); set(f.dataset.img, c.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85)); this.panel(); }; im.src = r.result; };
+      r.readAsDataURL(file);
+    });
+    p.querySelectorAll('[data-clrimg]').forEach(b => b.onclick = () => { set(b.dataset.clrimg, ''); this.panel(); });
+    RD.$('#ep-dup').onclick = () => this.dup(); RD.$('#ep-del').onclick = () => this.del();
+  }
+};
+RD.toHex = (c) => {
+  if (!c) return '#000000'; if (/^#[0-9a-f]{6}$/i.test(c)) return c;
+  if (/^#[0-9a-f]{3}$/i.test(c)) return '#' + c.slice(1).split('').map(x => x + x).join('');
+  const m = /rgba?\(([^)]+)\)/.exec(c); if (m) { const [r, g, b] = m[1].split(',').map(Number); return '#' + [r, g, b].map(x => Math.round(x).toString(16).padStart(2, '0')).join(''); }
+  return '#000000';
+};
+
+</script>
+</body>
+</html>

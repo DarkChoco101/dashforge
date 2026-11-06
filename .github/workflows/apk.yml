@@ -1,0 +1,35 @@
+name: Build Android APK
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+permissions: { contents: write }
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: android-actions/setup-android@v3
+      - run: python3 build.py
+      - run: npm install
+      - run: npx cap add android
+      - name: Permissions, landscape, keep-screen-on
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"/>\n    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>\n    <queries><intent><action android:name="android.intent.action.MAIN"/></intent></queries>\n    <application#' $M
+          sed -i 's#android:name=".MainActivity"#android:name=".MainActivity"\n            android:screenOrientation="sensorLandscape"#' $M
+          cat $M
+      - run: npx cap sync android
+      - name: Build debug APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk DashForge.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: DashForge-apk, path: DashForge.apk }
+      - name: Publish release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release delete latest -y --cleanup-tag || true
+          gh release create latest DashForge.apk --title "DashForge latest build" --notes "Debug APK built from ${{ github.sha }}. Install on the tablet (allow 'install unknown apps')."
