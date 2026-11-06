@@ -19,11 +19,17 @@ jobs:
         run: |
           M=android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"/>\n    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>\n    <queries><intent><action android:name="android.intent.action.MAIN"/></intent></queries>\n    <application#' $M
-          sed -i 's#android:name=".MainActivity"#android:name=".MainActivity"\n            android:screenOrientation="sensorLandscape"#' $M
+          sed -i 's#android:name=".MainActivity"#android:name=".MainActivity"\n            android:screenOrientation="sensorLandscape"\n            android:stateNotNeeded="true"\n            android:clearTaskOnLaunch="true"#' $M
+          sed -i 's#<category android:name="android.intent.category.LAUNCHER" */>#<category android:name="android.intent.category.LAUNCHER" />\n                <category android:name="android.intent.category.HOME" />\n                <category android:name="android.intent.category.DEFAULT" />#' $M
+          sed -i 's#<queries><intent><action android:name="android.intent.action.MAIN"/></intent></queries>#<queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent></queries>#' $M
           cat $M
+          D=android/app/src/main/java/com/dashforge/cardash
+          cp native/MainActivity.java native/DashLauncherPlugin.java $D/
       - run: npx cap sync android
-      - name: Build debug APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - name: Build debug APK (fixed signing key so updates install over the old version)
+        run: |
+          mkdir -p ~/.android && cp native/debug.keystore ~/.android/debug.keystore
+          cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
       - run: cp android/app/build/outputs/apk/debug/app-debug.apk DashForge.apk
       - uses: actions/upload-artifact@v4
         with: { name: DashForge-apk, path: DashForge.apk }

@@ -2,6 +2,7 @@
 'use strict';
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 RD.esc = esc;
+RD.nativeL = () => { try { return window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() ? window.Capacitor.Plugins.DashLauncher : null; } catch (e) { return null; } };
 const chOpts = (sel) => RD.chList().map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${esc(RD.CH[k].label)}</option>`).join('');
 RD.download = (name, text, type) => {
   const b = new Blob([text], { type: type || 'application/json' }), a = document.createElement('a');
@@ -26,6 +27,10 @@ RD.UI = {
     RD.$('#btn-media').onclick = () => RD.Media.toggle();
     RD.$('#btn-full').onclick = () => RD.fullscreen();
     RD.$('#btn-trip').onclick = () => RD.UI.trips();
+    RD.$('#btn-apps').onclick = () => RD.UI.apps();
+    window.addEventListener('dashBack', () => {
+      if (RD.$('#modal')) RD.UI.close(); else if (RD.editing) RD.Editor.stop(); else if (RD.Media.isOpen) RD.Media.close(); else RD.showHud();
+    });
     RD.bus.on('status', () => RD.updateHud());
   },
   welcome() {
@@ -46,6 +51,8 @@ RD.UI = {
       ['trips', '🗺️', 'Trips & GPS Log', RD.Trips.cur ? 'Recording…' : RD.Trips.list.length + ' saved'], ['perf', '⏱️', 'Performance', '0-100 · ¼ mile'], ['media', '▶️', 'Media & Apps', 'YouTube · launcher'],
       ['dtc', '🔧', 'Fault Codes', 'Read / clear'], ['alerts', '🔔', 'Alerts', (RD.settings.alerts || []).filter(a => a.on).length + ' active'], ['settings', '⚙️', 'Settings', 'Units, display, car'],
       ...(RD.installEvt ? [['install', '⬇️', 'Install App', 'Add to home screen']] : []),
+      ['apps', '⊞', 'All Apps', 'Every app on this tablet'],
+      ['home', '🏠', 'Home Screen', RD.nativeL() ? 'Set DashForge as Home' : 'Needs the APK'],
       ['device', '📱', 'Device Check', 'Tablet compatibility'], ['io', '💾', 'Backup & Share', 'Import / export'], ['night', '🌙', 'Night Mode', RD.settings.night ? 'On' : 'Off']
     ];
     const b = RD.UI.modal('Menu', `<div class="tiles">${tiles.map(t => `<button class="tile" data-k="${t[0]}"><span class="ic">${t[1]}</span><b>${t[2]}</b><small>${esc(t[3])}</small></button>`).join('')}</div>
@@ -55,6 +62,7 @@ RD.UI = {
       const k = t.dataset.k;
       if (k === 'edit') { RD.UI.close(); RD.Editor.start(); }
       else if (k === 'media') { RD.UI.close(); RD.Media.open(); }
+      else if (k === 'home') RD.UI.homeSetup();
       else if (k === 'install') { RD.installEvt.prompt(); RD.installEvt.userChoice.finally(() => { RD.installEvt = null; RD.UI.close(); }); }
       else if (k === 'night') { RD.settings.night = !RD.settings.night; RD.saveSettings(); RD.updateHud(); RD.UI.menu(); }
       else RD.UI[k]();
@@ -343,6 +351,36 @@ RD.UI = {
     b.querySelector('#dv-motion').onclick = async () => { await RD.Motion.start(); setTimeout(() => RD.UI.device(), 1500); };
   },
 
+  /* ---------- all apps drawer (launcher mode) ---------- */
+  async apps() {
+    const NL = RD.nativeL();
+    if (!NL) {
+      RD.UI.modal('All Apps', `<p class="hint">The full app drawer works in the DashForge APK (installed app). In the browser version, use the quick-launch buttons in the ▶ media dock.</p><p><a class="btn primary" href="https://github.com/DarkChoco101/dashforge/releases/download/latest/DashForge.apk">Download the APK</a></p>`);
+      return;
+    }
+    const b = RD.UI.modal('All Apps', `<input id="ap-q" placeholder="Search apps…" style="width:100%;margin:10px 0"><div class="apps" id="ap-grid"><p class="hint">Loading apps…</p></div>
+      <div class="row"><button class="btn sm" id="ap-set">Android Settings</button><button class="btn sm" id="ap-home">Change Home app</button></div>`, { wide: true });
+    b.querySelector('#ap-set').onclick = () => NL.openSettings();
+    b.querySelector('#ap-home').onclick = () => NL.homeSettings();
+    try {
+      if (!RD._apps || Date.now() - RD._appsT > 60000) { const r = await NL.listApps(); RD._apps = r.apps || []; RD._appsT = Date.now(); }
+      const grid = b.querySelector('#ap-grid'), draw = (q) => {
+        q = (q || '').toLowerCase();
+        grid.innerHTML = RD._apps.filter(a => !q || a.name.toLowerCase().includes(q)).map(a => `<button class="app" data-p="${esc(a.pkg)}">${a.icon ? `<img src="${a.icon}" width="58" height="58" style="border-radius:14px">` : '<span style="background:#333">' + esc(a.name[0]) + '</span>'}${esc(a.name)}</button>`).join('');
+        grid.querySelectorAll('.app').forEach(x => x.onclick = () => { RD.UI.close(); NL.launch({ pkg: x.dataset.p }); });
+      };
+      draw(''); b.querySelector('#ap-q').oninput = (e) => draw(e.target.value);
+    } catch (e) { b.querySelector('#ap-grid').innerHTML = '<p class="warn">Could not list apps: ' + esc(e.message || e) + '</p>'; }
+  },
+  homeSetup() {
+    const NL = RD.nativeL();
+    const b = RD.UI.modal('Home Screen', NL ? `<p class="lead">Make DashForge open every time you press Home or turn on the tablet.</p>
+      <ol class="feat"><li>Tap <b>Open Home settings</b> below</li><li>Choose <b>DashForge</b></li><li>Press Home — done. Your other apps live in <b>⊞ All Apps</b>.</li></ol>
+      <div class="row"><button class="btn primary big" id="hs-go">Open Home settings</button></div>
+      <p class="hint">To switch back later, open All Apps → Change Home app.</p>` : `<p>Launcher mode needs the installed DashForge APK.</p><p><a class="btn primary" href="https://github.com/DarkChoco101/dashforge/releases/download/latest/DashForge.apk">Download the APK</a></p>`);
+    const g = b.querySelector('#hs-go'); if (g) g.onclick = () => { RD.store.set('homeAsked', true); NL.homeSettings(); };
+  },
+
   /* ---------- backup / share ---------- */
   io() {
     const s = RD.skin();
@@ -382,7 +420,7 @@ RD.Media = {
       <div class="row"><input id="yt-url" placeholder="YouTube link or video ID"><button class="btn sm primary" id="yt-play">Play</button><button class="btn sm" id="yt-fav">★</button></div>
       <div class="favs">${this.favs.map((f, i) => `<span class="fav" data-i="${i}">${esc(f.t)}<i data-d="${i}">✕</i></span>`).join('')}</div>
       <div class="apps">${apps.map(a => `<button class="app" data-p="${esc(a[3])}"><span style="background:${a[1]}">${esc(a[2])}</span>${esc(a[0])}</button>`).join('')}
-      <button class="app" id="app-add"><span style="background:#333">+</span>Add app</button></div>
+      <button class="app" id="app-all"><span style="background:#2563eb">⊞</span>All apps</button><button class="app" id="app-add"><span style="background:#333">+</span>Add app</button></div>
       <div class="row"><input id="nav-to" placeholder="Navigate to… (address or place)"><button class="btn sm primary" id="nav-go">Go</button></div>`;
     d.querySelector('#dk-x').onclick = () => this.close();
     d.querySelector('#yt-play').onclick = () => this.play(d.querySelector('#yt-url').value);
@@ -395,6 +433,7 @@ RD.Media = {
       const v = this.favs[+f.dataset.i]; this.playId(v);
     });
     d.querySelectorAll('.app[data-p]').forEach(b => b.onclick = () => this.launch(b.dataset.p));
+    d.querySelector('#app-all').onclick = () => RD.UI.apps();
     d.querySelector('#app-add').onclick = () => {
       const n = prompt('App name (e.g. Gaana)'); if (!n) return; const p = prompt('Android package name (e.g. com.gaana). Find it in the Play Store URL after id='); if (!p) return;
       this.custom.push({ n, p }); RD.store.set('apps', this.custom); this.render();
@@ -419,6 +458,7 @@ RD.Media = {
   launch(p) {
     if (p.startsWith('tel:')) { location.href = 'tel:'; return; }
     const ua = navigator.userAgent;
+    const NL = RD.nativeL(); if (NL) { NL.launch({ pkg: p }).catch(() => RD.toast('That app is not installed')); return; }
     try { const AL = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppLauncher; if (AL && window.Capacitor.isNativePlatform()) { AL.openUrl({ url: p }).catch(() => RD.toast('App not installed')); return; } } catch (e) {}
     if (!/Android/i.test(ua)) { RD.toast('App launching works on the Android tablet'); return; }
     location.href = 'intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=' + p + ';end';

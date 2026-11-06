@@ -191,7 +191,8 @@ RD.boot = () => {
   RD.UI.initHud();
   requestAnimationFrame(RD.frame);
   RD.showHud();
-  if (!RD.store.get('welcomed', false)) { RD.store.set('welcomed', true); setTimeout(() => RD.UI.welcome(), 500); }
+  if (RD.nativeL && RD.nativeL() && !RD.store.get('homeAsked', false)) { setTimeout(() => RD.UI.homeSetup(), 1200); }
+  else if (!RD.store.get('welcomed', false)) { RD.store.set('welcomed', true); setTimeout(() => RD.UI.welcome(), 500); }
   if ('serviceWorker' in navigator && location.protocol === 'https:' && !window.Capacitor) navigator.serviceWorker.register('sw.js').catch(() => {});
 };
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); RD.installEvt = e; });
